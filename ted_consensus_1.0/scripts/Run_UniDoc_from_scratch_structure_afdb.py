@@ -9,7 +9,7 @@ from natsort import natsorted
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 BINDIR = os.path.join(SCRIPT_DIR, 'bin')
-UNIDOC = os.path.join(BINDIR, 'UniDoc_structure')
+UNIDOC = os.path.join(BINDIR, 'UniDoc_struct')
 STRIDE = os.path.join(BINDIR, 'stride')
 pdb_to_fasta = "pdb_tofasta"
 pdb_selres= "pdb_selres"
@@ -66,37 +66,59 @@ def main():
             # If chopping is provided, then extract all domain residues from PDB using pdb_tools
             # save as new file and point to the new file
             if chopping not in ['NULL','NO_SS']:
+                print(f"Processing chopping for {bn}: {chopping}")
                 pdb_path_chopped = pdb_bn + '_chopped.pdb'
                 resrng = chopping.replace('-',':').replace('_',',') # convert domain chopping into segments
+                print(f"Extracting residues {resrng} from {pdb_path}")
                 subprocess.check_output(f"{pdb_selres} -{resrng} {pdb_path} > {pdb_path_chopped} 2> /dev/null", shell=True)
                 
                 is_empty = os.stat(pdb_path_chopped).st_size == 0
                 if_exist = os.path.exists(pdb_path_chopped)
                 if if_exist and not is_empty:
+                    print(f"Successfully created chopped PDB file: {pdb_path_chopped}")
                     pdb = pdb_path_chopped
-            else:
-                pdb_path_chopped = None
-            
-            try:
-                # Run secondary structure calculation with STRIDE
-                subprocess.check_output(f"{STRIDE} {pdb} -r{args.chain} > {pdb_ss} 2> /dev/null", shell=True)
-                
-                # Run UniDoc
-                output = subprocess.check_output(f"{UNIDOC} {pdb} {args.chain} {pdb_ss}", shell=True)
-                
-                # Format the output
-                output = str(output, 'utf-8').replace('~','-').replace(',','_').replace('/',',').rstrip('\n')
+                else:
+                    print(f"Warning: Chopped PDB file is empty or does not exist: {pdb_path_chopped}")
+                    
+                try:
+                    # Run secondary structure calculation with STRIDE
+                    print(f"Running STRIDE on {pdb} for chain {args.chain}")
+                    subprocess.check_output(f"{STRIDE} {pdb} -r{args.chain} > {pdb_ss} 2> /dev/null", shell=True)
+                    
+                    # Run UniDoc
+                    print(f"Running UniDoc on {pdb}")
+                    # UniDoc_struct needs to be run from the directory containing it as it looks for ./stride
+                    # Change to the directory containing UNIDOC
+                    unidoc_dir = os.path.dirname(UNIDOC)
+                    original_dir = os.getcwd()
+                    os.chdir(unidoc_dir)
+                    
+                    # Run UniDoc from its directory
+                    output = subprocess.check_output(f"./UniDoc_struct {pdb} {args.chain} {pdb_ss}", shell=True)
+                    
+                    # Change back to original directory
+                    os.chdir(original_dir)
+                    # Format the output
+                    output = str(output, 'utf-8').replace('~','-').replace(',','_').replace('/',',').rstrip('\n')
+                    print(f"UniDoc output: {output}")
 
-                domains = output.split(',')
-                ndoms = len(domains)
-                chopping = ','.join(natsorted(domains))
-                
-                if chopping == '':
-                    chopping = "NULL"
+                    domains = output.split(',')
+                    ndoms = len(domains)
+                    chopping = ','.join(natsorted(domains))
+                    print(f"Found {ndoms} domains: {chopping}")
+                    
+                    if chopping == '':
+                        print("No domains found, setting chopping to NULL")
+                        chopping = "NULL"
+                        ndoms = 0
+                    
+                except Exception as e:
+                    print(f"Error processing {pdb}: {str(e)}")
+                    chopping = 'NO_SS'
                     ndoms = 0
-                
-            except:
-                chopping = 'NO_SS'
+            else:
+                print(f"Skipping processing for {bn} - chopping is {chopping}")
+                pdb_path_chopped = None
                 ndoms = 0
 
             # end_time = time.time() - start_time 
@@ -111,12 +133,19 @@ def main():
                 # end_time,
             ))
             
-            # Cleanup
-            if os.path.exists(pdb_ss):
-                os.remove(pdb_ss)
+            # Cleanup temporary files
+            try:
+                if os.path.exists(pdb_ss):
+                    os.remove(pdb_ss)
+                    print(f"Cleaned up temporary file: {pdb_ss}")
 
-            if os.path.exists(pdb_path_chopped):
-                os.remove(pdb_path_chopped)
+                if pdb_path_chopped and os.path.exists(pdb_path_chopped):
+                    os.remove(pdb_path_chopped)
+                    print(f"Cleaned up temporary file: {pdb_path_chopped}")
+            except Exception as e:
+                print(f"Warning: Error during cleanup: {str(e)}")
+            
+            print("--------------------------------------------------------------")
     
 if __name__ == "__main__":
     main()
