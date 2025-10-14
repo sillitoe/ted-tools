@@ -12,9 +12,9 @@ usage() {
 }
 
 # Check that the environment exists and activate it 
-VENV_DIR="ted_consensus"
-if [ -d "$VENV_DIR" ]; then
-    source $VENV_DIR/bin/activate
+venv_dir="${VENV_DIR:-ted_consensus}"
+if [ -d "$venv_dir" ]; then
+    source $venv_dir/bin/activate
 else
     echo "Virtual environment 'ted_consensus' does not exist."
     echo "Please run 'bash setup.sh' to create and set up the virtual environment."
