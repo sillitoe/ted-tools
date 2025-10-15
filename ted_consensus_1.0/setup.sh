@@ -4,12 +4,17 @@
 # please cite the following paper:
 # Lau et al., 2024. Exploring structural diversity across the protein universe with The Encyclopedia of Domains.
 
+set -eo pipefail
+
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
+# install dir can be overridden by setting the INSTALL_DIR environment variable
+TED_INSTALL_DIR=${TED_INSTALL_DIR:-$SCRIPT_DIR}
+
 # Define the name of the virtual environment directory
-VENV_DIR="ted_consensus"
-WEIGHTS_DIR="${SCRIPT_DIR}/programs/merizo/weights"
-UNIDOC_DIR="${SCRIPT_DIR}/programs/unidoc"
+VENV_DIR="${TED_INSTALL_DIR}/ted_consensus"
+WEIGHTS_DIR="${TED_INSTALL_DIR}/programs/merizo/weights"
+UNIDOC_DIR="${TED_INSTALL_DIR}/programs/unidoc"
 
 # Define base URL and weights files in an array
 BASE_URL="https://github.com/psipred/Merizo/raw/main/weights"
@@ -17,7 +22,7 @@ WEIGHTS_FILES=("weights_part_0.pt" "weights_part_1.pt" "weights_part_2.pt")
 
 # UniDoc package download URL
 UNIDOC_URL="https://yanglab.qd.sdu.edu.cn/UniDoc/download/UniDoc.tgz"
-UNIDOC_TGZ="${SCRIPT_DIR}/programs/unidoc.tgz"
+UNIDOC_TGZ="${TED_INSTALL_DIR}/programs/unidoc.tgz"
 
 # Function to check Python version
 check_python_version() {
@@ -51,26 +56,43 @@ fi
 # Create a virtual environment
 if [ ! -d "$VENV_DIR" ]; then
     echo "Creating virtual environment..."
-    $PYTHON_COMMAND -m venv $VENV_DIR
+    "$PYTHON_COMMAND" -m venv "$VENV_DIR"
 else
     echo "Virtual environment already exists."
 fi
 
 # Activate the virtual environment
-source $VENV_DIR/bin/activate
+source "$VENV_DIR/bin/activate"
 
 # Upgrade pip to the latest version
 echo "Upgrading pip..."
 pip install --upgrade pip
 
 # Install dependencies from requirements.txt
-if [ -f "requirements.txt" ]; then
+if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     echo "Installing dependencies from requirements.txt..."
-    pip install -r requirements.txt
+    pip install -r "${SCRIPT_DIR}/requirements.txt"
 else
-    echo "requirements.txt not found. Please make sure it exists in the current directory."
+    echo "Requirements file '${SCRIPT_DIR}/requirements.txt' not found. Please make sure it exists in the install directory."
     exit 1
 fi
+
+if [ ! -d "${TED_INSTALL_DIR}" ]; then
+    echo "Creating install directory..."
+    mkdir -p "${TED_INSTALL_DIR}"
+else
+    echo "Install directory already exists."
+fi
+
+# Copy over dirs if they do not exist
+for dirname in programs scripts; do
+    if [ ! -d "${TED_INSTALL_DIR}/${dirname}" ]; then
+        echo "Copying ${dirname} directory..."
+        cp -r "${SCRIPT_DIR}/${dirname}" "${TED_INSTALL_DIR}/${dirname}"
+    else
+        echo "${dirname} directory already exists."
+    fi
+done
 
 # Check if the weights directory exists
 if [ -d "$WEIGHTS_DIR" ]; then
@@ -94,16 +116,16 @@ if [ -d "$UNIDOC_DIR" ]; then
 else
     if test ! -f "${UNIDOC_TGZ}"; then
         echo "programs/unidoc directory not found. Downloading UniDoc ..."
-        wget -O "${UNIDOC_TGZ}" "${UNIDOC_URL}"
+        wget --no-check-certificate -O "${UNIDOC_TGZ}" "${UNIDOC_URL}"
     fi
 
     echo "Unpacking UniDoc package..."
-    tar -xzvf "${UNIDOC_TGZ}" -C "${SCRIPT_DIR}/programs"
-    mv "${SCRIPT_DIR}/programs/UniDoc" "${SCRIPT_DIR}/programs/unidoc"
-
-    # Copy the extra run script over to the unidoc dir
-    cp "scripts/Run_UniDoc_from_scratch_structure_afdb.py" "${UNIDOC_DIR}/"
+    tar -xzvf "${UNIDOC_TGZ}" -C "${TED_INSTALL_DIR}/programs"
+    mv "${TED_INSTALL_DIR}/programs/UniDoc" "${TED_INSTALL_DIR}/programs/unidoc"
 fi
+
+# Copy the extra run script over to the unidoc dir
+cp "${SCRIPT_DIR}/scripts/Run_UniDoc_from_scratch_structure_afdb.py" "${UNIDOC_DIR}/"
 
 # if running on macOS install compiler tools and compile stride from source:
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -115,7 +137,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
         read -p "Press enter after Xcode Command Line Tools installation is complete"
     fi
 
-    cd "${SCRIPT_DIR}/programs/chainsaw/stride" || exit
+    cd "${TED_INSTALL_DIR}/programs/chainsaw/stride" || exit
     # Remove all files except stride.tgz
     find . -type f ! -name 'stride.tgz' -delete
     # Extract the contents of stride.tgz

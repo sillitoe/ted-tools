@@ -11,12 +11,17 @@ usage() {
     exit 1
 }
 
-# Check that the environment exists and activate it 
-venv_dir="${VENV_DIR:-ted_consensus}"
-if [ -d "$venv_dir" ]; then
-    source $venv_dir/bin/activate
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+# install dir can be overridden by setting the INSTALL_DIR environment variable
+TED_INSTALL_DIR=${TED_INSTALL_DIR:-$SCRIPT_DIR}
+
+# Check that the environment exists and activate it
+VENV_DIR="${TED_INSTALL_DIR}/ted_consensus"
+if [ -d "$VENV_DIR" ]; then
+    source "${VENV_DIR}/bin/activate"
 else
-    echo "Virtual environment 'ted_consensus' does not exist."
+    echo "Virtual environment '${VENV_DIR}' does not exist."
     echo "Please run 'bash setup.sh' to create and set up the virtual environment."
     exit 1
 fi
@@ -46,12 +51,11 @@ if [ ! -d "$OUTPUT_DIR" ]; then
     mkdir -p "$OUTPUT_DIR"
 fi
 
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 PY=$(which python)
 
-SEGMENT="${SCRIPT_DIR}/scripts/segment.sh"
-CONSENSUS="${SCRIPT_DIR}/scripts/get_consensus.py"
-FILTER_DOMAINS="${SCRIPT_DIR}/scripts/filter_domains_consensus.py"
+SEGMENT="${TED_INSTALL_DIR}/scripts/segment.sh"
+CONSENSUS="${TED_INSTALL_DIR}/scripts/get_consensus.py"
+FILTER_DOMAINS="${TED_INSTALL_DIR}/scripts/filter_domains_consensus.py"
 
 # Run Merizo on the input directory
 out_merizo="${OUTPUT_DIR}/chopping_merizo.txt"
