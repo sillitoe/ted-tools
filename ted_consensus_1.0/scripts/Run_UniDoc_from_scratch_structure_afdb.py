@@ -95,7 +95,8 @@ def main():
                     chopping = "NULL"
                     ndoms = 0
                 
-            except:
+            except Exception as e:
+                print(f"Error processing {pdb_path}: {e}")
                 chopping = 'NO_SS'
                 ndoms = 0
 
