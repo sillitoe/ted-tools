@@ -12,14 +12,18 @@
 
 set -eu
 
-# Directories and paths
+# Directory of this script
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-PROG_DIR="${SCRIPT_DIR}/../programs"
+
+# Install dir can be overridden by setting the INSTALL_DIR environment variable
+TED_INSTALL_DIR=${TED_INSTALL_DIR:-$( cd -- "$( dirname -- "${SCRIPT_DIR}" )" &> /dev/null && pwd )}
+
+PROG_DIR="${TED_INSTALL_DIR}/programs"
 
 py=$(which python)
 custom_chopping=''
 
-FILTER_DOMAINS="${SCRIPT_DIR}/filter_domains.py"
+FILTER_DOMAINS="${TED_INSTALL_DIR}/scripts/filter_domains.py"
 
 while getopts ":i:m:o:c:" opt; do
   case $opt in
@@ -40,7 +44,7 @@ done
 
 # Check if both options are provided
 if [[ -z "${inputs}" || -z "${method}" || -z "${output}" ]]; then
-  echo "Usage: run_segment_afdb.sh -i <structure_directory> -m <merizo/unidoc/chainsaw> -o <output_directory> [-c <chopping>]"
+  echo "Usage: segment.sh -i <structure_directory> -m <merizo/unidoc/chainsaw> -o <output_directory> [-c <chopping>]"
   exit 1
 fi
 
@@ -73,10 +77,16 @@ if [ "${method}" = "merizo" ] || [ "${method}" = "unidoc" ]; then
     target_list="${output%/}targets.txt"
     readlink -f "${inputs}/"*.pdb > "${target_list}"
 
+    echo "Running ${method} on target list ${target_list}"
+
     if [[ ${custom_chopping} == '' ]]; then
+        set -x
         ${py} "${RUN_SCRIPT}" -l "${target_list}" --out "${output_file}"
+        set +x
     else
+        set -x
         ${py} "${RUN_SCRIPT}" -l "${target_list}" --out "${output_file}" --inherit_chopping "${custom_chopping}"
+        set +x
     fi
 
     # Cleanup
@@ -90,6 +100,7 @@ fi
 
 # Filter choppings to remove small segments and single-residue domains
 if test -f "${output_file}"; then
+    echo "Filtering domains in ${output_file} ..."
     "${py}" "${FILTER_DOMAINS}" "${output_file}" -o "${output_file}.tmp" --offset_resi "${OFFSET_RESI}"
 
     if [ $? == 0 ]; then
