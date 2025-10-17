@@ -146,7 +146,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
         read -p "Press enter after Xcode Command Line Tools installation is complete"
     fi
 
-    cd "${TED_INSTALL_DIR}/programs/chainsaw/stride" || exit
+    cd "${TED_INSTALL_DIR}/programs/chainsaw/stride"
     # Remove all files except stride.tgz
     find . -type f ! -name 'stride.tgz' -delete
     # Extract the contents of stride.tgz
@@ -155,8 +155,17 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     echo "Compiling stride for MacOS..."
     make
     chmod +x stride
+
+    echo "Copying stride binary to unidoc bin directory..."
+    cp stride "${UNIDOC_DIR}/bin"
+
+    echo "Compiling unidoc for MacOS..."
+    cd "${UNIDOC_DIR}/src"
+    rm -f UniDoc_struct UniDoc_seq ../bin/UniDoc_struct ../bin/UniDoc_seq
+    g++ -std=c++0x   -O3 -ffast-math -lm -o UniDoc_struct UniDoc_struct.cpp && mv UniDoc_struct ../bin/
+    g++ -std=c++0x   -O3 -ffast-math -lm -o UniDoc_seq UniDoc_seq.cpp && mv UniDoc_seq ../bin/
     # Change back to the original directory
-    cd - || exit
+    cd $SCRIPT_DIR
 fi
 
 echo "Successfully set up ted_consensus"
