@@ -5,6 +5,8 @@
 
 # Lau et al., 2024. Exploring structural diversity across the protein universe with The Encyclopedia of Domains.
 
+set -e -o pipefail
+
 # Function to display usage message
 usage() {
     echo "Usage: $0 -i <input_directory_with_pdb_files> -o <output_directory>"
@@ -57,10 +59,22 @@ SEGMENT="${TED_INSTALL_DIR}/scripts/segment.sh"
 CONSENSUS="${TED_INSTALL_DIR}/scripts/get_consensus.py"
 FILTER_DOMAINS="${TED_INSTALL_DIR}/scripts/filter_domains_consensus.py"
 
+# Print useful info
+echo "Input directory: ${INPUT_DIR}"
+echo "Output directory: ${OUTPUT_DIR}"
+echo "Python: ${PY}"
+echo "Segmentation script: ${SEGMENT}"
+echo "Consensus script: ${CONSENSUS}"
+echo "Filter domains script: ${FILTER_DOMAINS}"
+
+
 # Run Merizo on the input directory
 out_merizo="${OUTPUT_DIR}/chopping_merizo.txt"
 log_merizo="${OUTPUT_DIR}/chopping_merizo.log"
+echo "Running Merizo..."
+set -x
 bash "${SEGMENT}" -i "${INPUT_DIR}" -m merizo -o "${OUTPUT_DIR}" > "${log_merizo}" 2>&1
+set +x
 
 if test ! -f "${out_merizo}" || test ! -s "${out_merizo}"; then
     echo "Expected to find chopping file for Merizo at ${out_merizo}!"
@@ -70,7 +84,10 @@ fi
 # Run UniDoc on the Merizo output
 out_unidoc="${OUTPUT_DIR}/chopping_unidoc.txt"
 log_unidoc="${OUTPUT_DIR}/chopping_unidoc.log"
+echo "Running UniDoc on Merizo output..."
+set -x
 bash "${SEGMENT}" -i "${INPUT_DIR}" -m unidoc -o "${OUTPUT_DIR}" -c "${out_merizo}" > "${log_unidoc}" 2>&1
+set +x
 
 if test ! -f "${out_unidoc}" || test ! -s "${out_unidoc}"; then
     echo "Expected to find chopping file for UniDoc at ${out_unidoc}!"
@@ -80,7 +97,10 @@ fi
 # Run Chainsaw on the input directory
 out_chainsaw="${OUTPUT_DIR}/chopping_chainsaw.txt"
 log_chainsaw="${OUTPUT_DIR}/chopping_chainsaw.log"
+echo "Running Chainsaw..."
+set -x
 bash "${SEGMENT}" -i "${INPUT_DIR}" -m chainsaw -o "${OUTPUT_DIR}" > "${log_chainsaw}" 2>&1
+set +x
 
 if test ! -f "${out_chainsaw}" || test ! -s "${out_chainsaw}"; then
     echo "Expected to find chopping file for Chainsaw at ${out_chainsaw}!"
