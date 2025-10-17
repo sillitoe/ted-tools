@@ -122,6 +122,15 @@ else
     echo "Unpacking UniDoc package..."
     tar -xzvf "${UNIDOC_TGZ}" -C "${TED_INSTALL_DIR}/programs"
     mv "${TED_INSTALL_DIR}/programs/UniDoc" "${TED_INSTALL_DIR}/programs/unidoc"
+
+    # macOS C/C++ compatibility: replace non-portable <malloc.h> with <stdlib.h>
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "Patching UniDoc C/C++ sources for macOS (malloc.h -> stdlib.h)..."
+        # Replace in all source files under UniDoc
+        while IFS= read -r -d '' hdr; do
+            sed -E -i '' 's#<malloc.h>#<stdlib.h>#g' "$hdr"
+        done < <(find "${UNIDOC_DIR}" -type f \( -name "*.h" -o -name "*.hpp" -o -name "*.c" -o -name "*.cpp" \) -print0)
+    fi
 fi
 
 # Copy the extra run script over to the unidoc dir
