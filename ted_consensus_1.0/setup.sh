@@ -4,6 +4,8 @@
 # please cite the following paper:
 # Lau et al., 2024. Exploring structural diversity across the protein universe with The Encyclopedia of Domains.
 
+set -e -o pipefail
+
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 # Define the name of the virtual environment directory
