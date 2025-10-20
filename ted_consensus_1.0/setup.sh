@@ -98,7 +98,7 @@ if [ -d "$UNIDOC_DIR" ]; then
 else
     if test ! -f "${UNIDOC_TGZ}"; then
         echo "programs/unidoc directory not found. Downloading UniDoc ..."
-        wget -O "${UNIDOC_TGZ}" "${UNIDOC_URL}"
+        wget --no-check-certificate -O "${UNIDOC_TGZ}" "${UNIDOC_URL}"
     fi
 
     echo "Unpacking UniDoc package..."
@@ -128,6 +128,18 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     echo "Compiling stride for MacOS..."
     make
     chmod +x stride
+
+    echo "Copying compiled stride to unidoc bin directory..."
+    cp stride "${SCRIPT_DIR}/programs/unidoc/bin/"
+
+    echo "Compiling unidoc for MacOS..."
+    cd "${UNIDOC_DIR}/src"
+
+    rm -f ../bin/UniDoc_struct
+    # patch to remove all includes for malloc.h for macOS
+    sed -i.bak '/#include <malloc.h>/d' *.h
+    g++ -std=c++0x   -O3 -ffast-math -lm -o ../bin/UniDoc_struct UniDoc_struct.cpp
+
     # Change back to the original directory
     cd - || exit
 fi
