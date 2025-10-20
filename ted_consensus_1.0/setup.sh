@@ -21,6 +21,8 @@ WEIGHTS_FILES=("weights_part_0.pt" "weights_part_1.pt" "weights_part_2.pt")
 UNIDOC_URL="https://yanglab.qd.sdu.edu.cn/UniDoc/download/UniDoc.tgz"
 UNIDOC_TGZ="${SCRIPT_DIR}/programs/unidoc.tgz"
 
+ORIG_DIR=$(pwd)
+
 # Function to check Python version
 check_python_version() {
     PYTHON_VERSION=$($1 -c "import sys; print('.'.join(map(str, sys.version_info[:3])))")
@@ -128,6 +130,13 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     chmod +x stride
     # Change back to the original directory
     cd - || exit
+fi
+
+# Create symlink to stride in the main directory
+cd $ORIG_DIR
+if [ ! -f "./stride" ]; then
+    echo "Creating symlink to stride in the working directory (keep unidoc happy) ..."
+    ln -s "${SCRIPT_DIR}/programs/unidoc/bin/stride" .
 fi
 
 echo "Successfully set up ted_consensus"
