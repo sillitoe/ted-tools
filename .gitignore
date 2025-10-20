@@ -1,0 +1,4 @@
+# ignore runtime / build files
+**/*.pyc
+**/__pycache__/
+**/*.o
