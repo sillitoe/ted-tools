@@ -9,7 +9,7 @@ from natsort import natsorted
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 BINDIR = os.path.join(SCRIPT_DIR, 'bin')
-UNIDOC = os.path.join(BINDIR, 'UniDoc_structure')
+UNIDOC = os.path.join(BINDIR, 'UniDoc_struct')
 STRIDE = os.path.join(BINDIR, 'stride')
 pdb_to_fasta = "pdb_tofasta"
 pdb_selres= "pdb_selres"
@@ -95,7 +95,8 @@ def main():
                     chopping = "NULL"
                     ndoms = 0
                 
-            except:
+            except Exception as e:
+                print(f"Error occurred while processing {pdb_path}: {e}")
                 chopping = 'NO_SS'
                 ndoms = 0
 
