@@ -15,10 +15,6 @@ UNIDOC_DIR="${SCRIPT_DIR}/programs/unidoc"
 BASE_URL="https://github.com/psipred/Merizo/raw/main/weights"
 WEIGHTS_FILES=("weights_part_0.pt" "weights_part_1.pt" "weights_part_2.pt")
 
-# UniDoc package download URL
-UNIDOC_URL="https://yanglab.qd.sdu.edu.cn/UniDoc/download/UniDoc.tgz"
-UNIDOC_TGZ="${SCRIPT_DIR}/programs/unidoc.tgz"
-
 # Function to check Python version
 check_python_version() {
     PYTHON_VERSION=$($1 -c "import sys; print('.'.join(map(str, sys.version_info[:3])))")
@@ -88,22 +84,8 @@ for WEIGHT_FILE in "${WEIGHTS_FILES[@]}"; do
     fi
 done
 
-# Check if the unidoc directory exists
-if [ -d "$UNIDOC_DIR" ]; then
-    echo "programs/unidoc directory already exists."
-else
-    if test ! -f "${UNIDOC_TGZ}"; then
-        echo "programs/unidoc directory not found. Downloading UniDoc ..."
-        wget -O "${UNIDOC_TGZ}" "${UNIDOC_URL}"
-    fi
-
-    echo "Unpacking UniDoc package..."
-    tar -xzvf "${UNIDOC_TGZ}" -C "${SCRIPT_DIR}/programs"
-    mv "${SCRIPT_DIR}/programs/UniDoc" "${SCRIPT_DIR}/programs/unidoc"
-
-    # Copy the extra run script over to the unidoc dir
-    cp "scripts/Run_UniDoc_from_scratch_structure_afdb.py" "${UNIDOC_DIR}/"
-fi
+echo "Copy custom UniDoc script to UniDoc directory..."
+cp "scripts/Run_UniDoc_from_scratch_structure_afdb.py" "${UNIDOC_DIR}/"
 
 # if running on macOS install compiler tools and compile stride from source:
 if [[ "$OSTYPE" == "darwin"* ]]; then
