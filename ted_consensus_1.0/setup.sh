@@ -117,17 +117,54 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
         read -p "Press enter after Xcode Command Line Tools installation is complete"
     fi
 
-    cd "${SCRIPT_DIR}/programs/chainsaw/stride" || exit
-    # Remove all files except stride.tgz
-    find . -type f ! -name 'stride.tgz' -delete
-    # Extract the contents of stride.tgz
-    tar -zxf stride.tgz
-    # Compile stride
-    echo "Compiling stride for MacOS..."
-    make
-    chmod +x stride
-    # Change back to the original directory
-    cd - || exit
+    # check to see if the stride binary runs
+    # with a zero exit code, if not compile it
+    STRIDE_BIN="${UNIDOC_DIR}/bin/stride"
+    if "${STRIDE_BIN}" > /dev/null 2>&1; then
+        echo "Stride binary found."
+    else
+        rc=$?
+        echo "Stride binary failed (exit code ${rc})."
+
+        ORIG_DIR=$(pwd)
+        cd "${SCRIPT_DIR}/programs/chainsaw/stride" || exit
+        # Remove all files except stride.tgz
+        find . -type f ! -name 'stride.tgz' -delete
+        # Extract the contents of stride.tgz
+        tar -zxf stride.tgz
+        # Compile stride
+        echo "Compiling stride for MacOS..."
+        make
+        chmod +x stride
+
+        echo "Copying compiled stride to unidoc bin directory..."
+        cp stride "${STRIDE_BIN}"
+
+        cd "${ORIG_DIR}"
+    fi
 fi
+
+# check to see if the UniDoc_struct binary runs
+# with a zero exit code, if not compile it
+UNIDOC_STRUCT_BIN="${UNIDOC_DIR}/bin/UniDoc_struct"
+if "${UNIDOC_STRUCT_BIN}" > /dev/null 2>&1; then
+    echo "UniDoc_struct binary found."
+else
+    rc=$?
+    echo "UniDoc_struct binary failed (exit code ${rc})."
+
+    # Compile UniDoc_struct
+    echo "Compiling UniDoc_struct from src..."
+    ORIG_DIR=$(pwd)
+    cd "${UNIDOC_DIR}/src"
+    rm -f "${UNIDOC_STRUCT_BIN}"
+    # patch to remove all includes for malloc.h
+    sed -i.bak '/#include <malloc.h>/d' *.h
+    g++ -std=c++0x   -O3 -ffast-math -lm -o "${UNIDOC_STRUCT_BIN}" UniDoc_struct.cpp
+
+    # Change back to the original directory
+    cd "${ORIG_DIR}"
+fi
+
 
 echo "Successfully set up ted_consensus"
