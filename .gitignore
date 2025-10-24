@@ -1,0 +1,4 @@
+*.pyc
+__pycache__/
+*.o
+ted_consensus_1.0/ted_consensus/
