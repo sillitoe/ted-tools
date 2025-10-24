@@ -4,6 +4,8 @@
 # please cite the following paper:
 # Lau et al., 2024. Exploring structural diversity across the protein universe with The Encyclopedia of Domains.
 
+set -e -o pipefail
+
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 # Define the name of the virtual environment directory
@@ -16,7 +18,7 @@ BASE_URL="https://github.com/psipred/Merizo/raw/main/weights"
 WEIGHTS_FILES=("weights_part_0.pt" "weights_part_1.pt" "weights_part_2.pt")
 
 # UniDoc package download URL
-UNIDOC_URL="https://yanglab.qd.sdu.edu.cn/UniDoc/download/UniDoc.tgz"
+UNIDOC_URL="https://yanglab.qd.sdu.edu.cn/UniDoc/download/UniDoc_20251022.tgz"
 UNIDOC_TGZ="${SCRIPT_DIR}/programs/unidoc.tgz"
 
 # Function to check Python version
@@ -94,7 +96,7 @@ if [ -d "$UNIDOC_DIR" ]; then
 else
     if test ! -f "${UNIDOC_TGZ}"; then
         echo "programs/unidoc directory not found. Downloading UniDoc ..."
-        wget -O "${UNIDOC_TGZ}" "${UNIDOC_URL}"
+        wget --no-check-certificate -O "${UNIDOC_TGZ}" "${UNIDOC_URL}"
     fi
 
     echo "Unpacking UniDoc package..."
