@@ -66,9 +66,9 @@ echo "Upgrading pip..."
 pip install --upgrade pip
 
 # Install dependencies from requirements.txt
-if [ -f "requirements.txt" ]; then
+if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     echo "Installing dependencies from requirements.txt..."
-    pip install -r requirements.txt
+    pip install -r "${SCRIPT_DIR}/requirements.txt"
 else
     echo "requirements.txt not found. Please make sure it exists in the current directory."
     exit 1
@@ -107,7 +107,7 @@ done
 # fi
 
 # Copy the extra run script over to the unidoc dir
-cp "scripts/Run_UniDoc_from_scratch_structure_afdb.py" "${UNIDOC_DIR}/"
+cp "${SCRIPT_DIR}/scripts/Run_UniDoc_from_scratch_structure_afdb.py" "${UNIDOC_DIR}/"
 
 # if running on macOS install compiler tools and compile stride from source:
 if [[ "$OSTYPE" == "darwin"* ]]; then
