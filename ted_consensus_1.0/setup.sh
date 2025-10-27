@@ -118,32 +118,32 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
         # Wait for installation to complete or prompt user to press enter after installation
         read -p "Press enter after Xcode Command Line Tools installation is complete"
     fi
+fi
 
-    # check to see if the stride binary runs
-    # with a zero exit code, if not compile it
-    STRIDE_BIN="${UNIDOC_DIR}/bin/stride"
-    if "${STRIDE_BIN}" > /dev/null 2>&1; then
-        echo "Stride binary found."
-    else
-        rc=$?
-        echo "Stride binary failed (exit code ${rc})."
+# check to see if the stride binary runs
+# with a zero exit code, if not compile it
+STRIDE_BIN="${UNIDOC_DIR}/bin/stride"
+if "${STRIDE_BIN}" > /dev/null 2>&1; then
+    echo "Stride binary found."
+else
+    rc=$?
+    echo "Stride binary failed (exit code ${rc})."
 
-        ORIG_DIR=$(pwd)
-        cd "${SCRIPT_DIR}/programs/chainsaw/stride" || exit
-        # Remove all files except stride.tgz
-        find . -type f ! -name 'stride.tgz' -delete
-        # Extract the contents of stride.tgz
-        tar -zxf stride.tgz
-        # Compile stride
-        echo "Compiling stride for MacOS..."
-        make
-        chmod +x stride
+    ORIG_DIR=$(pwd)
+    cd "${SCRIPT_DIR}/programs/chainsaw/stride" || exit
+    # Remove all files except stride.tgz
+    find . -type f ! -name 'stride.tgz' -delete
+    # Extract the contents of stride.tgz
+    tar -zxf stride.tgz
+    # Compile stride
+    echo "Compiling stride for MacOS..."
+    make
+    chmod +x stride
 
-        echo "Copying compiled stride to unidoc bin directory..."
-        cp stride "${STRIDE_BIN}"
+    echo "Copying compiled stride to unidoc bin directory..."
+    cp stride "${STRIDE_BIN}"
 
-        cd "${ORIG_DIR}"
-    fi
+    cd "${ORIG_DIR}"
 fi
 
 # check to see if the UniDoc_struct binary runs
