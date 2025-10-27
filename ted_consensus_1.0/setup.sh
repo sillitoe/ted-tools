@@ -109,16 +109,6 @@ done
 # Copy the extra run script over to the unidoc dir
 cp "${SCRIPT_DIR}/scripts/Run_UniDoc_from_scratch_structure_afdb.py" "${UNIDOC_DIR}/"
 
-# if running on macOS install compiler tools and compile stride from source:
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS only
-    if ! command -v gcc &> /dev/null || ! command -v make &> /dev/null; then
-        echo "Installing Xcode Command Line Tools..."
-        xcode-select --install
-        # Wait for installation to complete or prompt user to press enter after installation
-        read -p "Press enter after Xcode Command Line Tools installation is complete"
-    fi
-fi
 
 # check to see if the stride binary runs
 # with a zero exit code, if not compile it
@@ -129,6 +119,17 @@ else
     rc=$?
     echo "Stride binary failed (exit code ${rc})."
 
+    # if running on macOS install compiler tools and compile stride from source:
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS only
+        if ! command -v gcc &> /dev/null || ! command -v make &> /dev/null; then
+            echo "Installing Xcode Command Line Tools..."
+            xcode-select --install
+            # Wait for installation to complete or prompt user to press enter after installation
+            read -p "Press enter after Xcode Command Line Tools installation is complete"
+        fi
+    fi
+
     ORIG_DIR=$(pwd)
     cd "${SCRIPT_DIR}/programs/chainsaw/stride" || exit
     # Remove all files except stride.tgz
@@ -136,7 +137,7 @@ else
     # Extract the contents of stride.tgz
     tar -zxf stride.tgz
     # Compile stride
-    echo "Compiling stride for MacOS..."
+    echo "Compiling stride..."
     make
     chmod +x stride
 
