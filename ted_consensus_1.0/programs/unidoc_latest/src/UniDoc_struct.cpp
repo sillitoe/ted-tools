@@ -1,4 +1,4 @@
-#include"utils.h"
+#include"utils_struct.h"
 #include <stdlib.h>
 #include <math.h>
 #include <string>
@@ -13,20 +13,33 @@ using namespace std;
 void print_help(const char* arg) {
 	cout << endl
 		<< " Usage: " << arg << " PDB.pdb" << "  chain" << endl << endl;
+	cout << "Please leave the chain ID empty in case the pdb file does not have an chain ID" <<endl;
 	exit(EXIT_SUCCESS);
 }
+
+
 int main(int argc, const char* argv[])
 {
 	if (argc < 2) {
 		print_help(argv[0]);
 	}
+
+	string chain = " ";
+
+	if(argc >2)
+	  {
+	    chain=argv[2];
+	    
+	  }
+//cout << "chain="<< chain << "!" <<endl;	
 	//step 1:get PDB file
 	string pdb = argv[1];
 	ifstream inPDB(argv[1]);
 	string PDBstr;
 	int tag = 1;
 	while (getline(inPDB, PDBstr)) {
-		string chain = argv[2];
+	  //string chain = argv[2];
+	  if (PDBstr.size()<22) continue;
 		if (PDBstr.compare(21, 1, chain) == 0) {
 			
 			if (PDBstr.substr(0, 5) == "ATOM ") {
@@ -50,7 +63,8 @@ int main(int argc, const char* argv[])
 	string PDBstr1;
 	string residueNum1 = "-10001";
 	while (getline(inPDB1, PDBstr1)) {
-		string chain = argv[2];
+	  //string chain = argv[2];
+	  if (PDBstr1.size()<22) continue;
 		if (PDBstr1.compare(21, 1, chain) == 0) {
 			if (PDBstr1.substr(0, 5) == "ATOM ") {
 				string atom_name = PDBstr1.substr(12, 4);
@@ -77,7 +91,8 @@ int main(int argc, const char* argv[])
 	string residueNum2 = "-1000";
 	while (getline(inPDB2, PDBstr2))
 	{
-		string chain = argv[2];
+	  //string chain = argv[2];
+	  if (PDBstr2.size()<22) continue;
 		if (PDBstr2.compare(21, 1, chain) == 0) {
 			if (PDBstr2.substr(0, 5) == "ATOM ") {
 				string atom_name = PDBstr2.substr(12, 4);
@@ -122,9 +137,9 @@ int main(int argc, const char* argv[])
 	vector<string> ss;
 	vector<int> vsec;
 	if (tag == 0) {
-		string chain = argv[2];
+	  //string chain = argv[2];
 		string s = "./stride " + std::string("-r") + chain + " " + pdb + ">pdb_ss";
-		system(s.c_str());
+		int systemRet = system(s.c_str());
 		ifstream fin("pdb_ss");
 		string row;
 		while (getline(fin, row)) {

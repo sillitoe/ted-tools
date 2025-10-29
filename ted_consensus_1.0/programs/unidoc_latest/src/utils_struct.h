@@ -359,9 +359,9 @@ string Cut_Domain_sec(double** ConMatrix, vector<int> W, vector<int> N,vector<in
 	double MINnnc2 = 10000;
 	if (length > 60) {
 		for (int k1 = 15; k1 < length - 15; k1++) {
-			if (V[k1] == 1) {
+			if (V[k1] == 1  ) {
 				for (int k2 = k1 + 35; k2 < length - 15; k2++) {
-					if (V[k2] == 1) {
+					if (V[k2] == 1 ) {
 						if (ConMatrix[W[k1]][W[k2]] > 0.5) {
 							double nc = 0.0;
 							for (int i = k1 + 1; i < k2; i++) {
