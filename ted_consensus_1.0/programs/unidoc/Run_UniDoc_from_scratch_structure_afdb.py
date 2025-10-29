@@ -78,12 +78,14 @@ def main():
                 pdb_path_chopped = None
             
             try:
-                # Run secondary structure calculation with STRIDE
-                subprocess.check_output(f"{STRIDE} {pdb} -r{args.chain} > {pdb_ss} 2> /dev/null", shell=True)
+                # # Run secondary structure calculation with STRIDE
+                # subprocess.check_output(f"{STRIDE} {pdb} -r{args.chain} > {pdb_ss} 2> /dev/null", shell=True)
                 
-                # Run UniDoc
-                output = subprocess.check_output(f"{UNIDOC} {pdb} {args.chain} {pdb_ss}", shell=True)
-                
+                # # Run UniDoc
+                # output = subprocess.check_output(f"{UNIDOC} {pdb} {args.chain} {pdb_ss}", shell=True)
+
+                output = subprocess.check_output(f"{UNIDOC} {pdb} {args.chain}", shell=True)
+
                 # Format the output
                 output = str(output, 'utf-8').replace('~','-').replace(',','_').replace('/',',').rstrip('\n')
 
