@@ -11,8 +11,27 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 # Define the name of the virtual environment directory
 VENV_DIR="ted_consensus"
 WEIGHTS_DIR="${SCRIPT_DIR}/programs/merizo/weights"
+
+UNIDOC_LATEST_DIR="${SCRIPT_DIR}/programs/unidoc_latest"
+UNIDOC_TED_V1_0_DIR="${SCRIPT_DIR}/programs/unidoc_ted_v1_0"
 UNIDOC_DIR="${SCRIPT_DIR}/programs/unidoc"
-UNIDOC_TED_DIR="${SCRIPT_DIR}/programs/unidoc_ted_v1_0"
+TED_VERSION=${TED_VERSION:-"latest"}
+
+if [ "$TED_VERSION" == "latest" ]; then
+    echo "Using latest UniDoc version"
+    UNIDOC_SRC_DIR="$UNIDOC_LATEST_DIR"
+elif [ "$TED_VERSION" == "1.0" ]; then
+    echo "Using TED UniDoc version 1.0"
+    UNIDOC_SRC_DIR="$UNIDOC_TED_V1_0_DIR"
+else
+    echo "Unknown TED_VERSION: $TED_VERSION"
+    exit 1
+fi
+
+# Copy UniDoc source files to unidoc directory
+echo "Setting up UniDoc in programs/unidoc (TED ${TED_VERSION}) ..."
+mkdir -p "$UNIDOC_DIR"
+rsync -a --delete "$UNIDOC_SRC_DIR/" "$UNIDOC_DIR/"
 
 # Define base URL and weights files in an array
 BASE_URL="https://github.com/psipred/Merizo/raw/main/weights"
@@ -131,6 +150,11 @@ if "${UNIDOC_STRUCT_BIN}" > /dev/null 2>&1; then
 else
     rc=$?
     echo "UniDoc_struct binary failed (exit code ${rc})."
+
+    if [ $TED_VERSION == "1.0" ]; then
+        echo "ERROR: cannot continue. UniDoc_struct binary is missing or not working and we cannot compile from source (since TED_VERSION is set to 1.0). If you want to run on MacOS, set TED_VERSION to 'latest'."
+        exit 1
+    fi
 
     # Compile UniDoc_struct
     echo "Compiling UniDoc_struct from src..."
