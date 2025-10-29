@@ -4,12 +4,15 @@
 # please cite the following paper:
 # Lau et al., 2024. Exploring structural diversity across the protein universe with The Encyclopedia of Domains.
 
+set -e -o pipefail
+
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 # Define the name of the virtual environment directory
 VENV_DIR="ted_consensus"
 WEIGHTS_DIR="${SCRIPT_DIR}/programs/merizo/weights"
 UNIDOC_DIR="${SCRIPT_DIR}/programs/unidoc"
+UNIDOC_TED_DIR="${SCRIPT_DIR}/programs/unidoc_ted_v1_0"
 
 # Define base URL and weights files in an array
 BASE_URL="https://github.com/psipred/Merizo/raw/main/weights"
@@ -84,8 +87,6 @@ for WEIGHT_FILE in "${WEIGHTS_FILES[@]}"; do
     fi
 done
 
-echo "Copy custom UniDoc script to UniDoc directory..."
-cp "scripts/Run_UniDoc_from_scratch_structure_afdb.py" "${UNIDOC_DIR}/"
 
 # if running on macOS install compiler tools and compile stride from source:
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -97,17 +98,51 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
         read -p "Press enter after Xcode Command Line Tools installation is complete"
     fi
 
-    cd "${SCRIPT_DIR}/programs/chainsaw/stride" || exit
-    # Remove all files except stride.tgz
-    find . -type f ! -name 'stride.tgz' -delete
-    # Extract the contents of stride.tgz
-    tar -zxf stride.tgz
-    # Compile stride
-    echo "Compiling stride for MacOS..."
-    make
-    chmod +x stride
+    STRIDE_BIN="${UNIDOC_DIR}/bin/stride"
+    if "${STRIDE_BIN}" > /dev/null 2>&1; then
+        echo "Stride binary found."
+    else
+        rc=$?
+        echo "Stride binary failed (exit code ${rc})."
+
+        ORIG_DIR=$(pwd)
+        cd "${SCRIPT_DIR}/programs/chainsaw/stride" || exit
+        # Remove all files except stride.tgz
+        find . -type f ! -name 'stride.tgz' -delete
+        # Extract the contents of stride.tgz
+        tar -zxf stride.tgz
+        # Compile stride
+        echo "Compiling stride for MacOS..."
+        make
+        chmod +x stride
+
+        echo "Copying compiled stride to unidoc bin directory..."
+        cp stride "${STRIDE_BIN}"
+
+        cd "${ORIG_DIR}"
+    fi
+fi
+
+# check to see if the UniDoc_struct binary runs
+# with a zero exit code, if not compile it
+UNIDOC_STRUCT_BIN="${UNIDOC_DIR}/bin/UniDoc_struct"
+if "${UNIDOC_STRUCT_BIN}" > /dev/null 2>&1; then
+    echo "UniDoc_struct binary found."
+else
+    rc=$?
+    echo "UniDoc_struct binary failed (exit code ${rc})."
+
+    # Compile UniDoc_struct
+    echo "Compiling UniDoc_struct from src..."
+    ORIG_DIR=$(pwd)
+    cd "${UNIDOC_DIR}/src"
+    rm -f "${UNIDOC_STRUCT_BIN}"
+    # patch to remove all includes for malloc.h for macOS
+    sed -i.bak '/#include <malloc.h>/d' *.h
+    g++ -std=c++0x   -O3 -ffast-math -lm -o "${UNIDOC_STRUCT_BIN}" UniDoc_struct.cpp
+
     # Change back to the original directory
-    cd - || exit
+    cd "${ORIG_DIR}"
 fi
 
 echo "Successfully set up ted_consensus"

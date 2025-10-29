@@ -29,7 +29,7 @@ def main():
     
     parser.add_argument("-c",dest='chain', required=False, type=str, default='A', help="the chain of parsed protein")
     parser.add_argument("--out",dest='outfile', required=True, type=str, help="output file to write results to")
-    parser.add_argument("--inherit_chopping", type=str, required=False, default=None, help="Pass a file containing choppings from Merizo or Chainsaw. Rows should match targets in --input.")
+    parser.add_argument("--inherit_chopping", type=str, required=True, default=None, help="Pass a file containing choppings from Merizo or Chainsaw. Rows should match targets in --input.")
     
     args = parser.parse_args()
     
@@ -37,20 +37,21 @@ def main():
         files = args.input
 
     if args.list is not None:
-        with open(args.list, 'r') as f:
-            files = [line.rstrip('\n') for line in f]
+        with open(args.list, 'r') as fn:
+            files = [line.rstrip('\n') for line in fn]
             
-    if args.inherit_chopping == 'None':
-        inherit_chopping = ['NULL' for _ in range(len(files))]
-    elif args.inherit_chopping is not None:
-        with open(args.inherit_chopping, 'r') as f:
-            inherit_chopping = [line.rstrip('\n') for line in f]
+    chopping_dict = {}
+    with open(args.inherit_chopping, 'r') as fn:
+        for line in fn:
+            line_split = line.rstrip('\n').split('\t')
+            chopping_dict[line_split[0]] = line_split[-2]
 
     with open(args.outfile, 'w') as fn:
-        for pdb_path, chopping in zip(files, inherit_chopping):
+        for pdb_path in files:
             start_time = time.time()
-            
-            bn, _ = os.path.splitext(os.path.basename(pdb_path))
+            bn, ext = os.path.splitext(os.path.basename(pdb_path))
+            chopping = chopping_dict[bn]
+
             pdb = os.path.realpath(pdb_path)
             pdb_bn, pdb_ext = os.path.splitext(pdb)
             pdb_ss = pdb + '.ss'
@@ -73,14 +74,18 @@ def main():
                 if_exist = os.path.exists(pdb_path_chopped)
                 if if_exist and not is_empty:
                     pdb = pdb_path_chopped
+            else:
+                pdb_path_chopped = None
             
             try:
-                # Run secondary structure calculation with STRIDE
-                subprocess.check_output(f"{STRIDE} {pdb} -r{args.chain} > {pdb_ss} 2> /dev/null", shell=True)
+                # # Run secondary structure calculation with STRIDE
+                # subprocess.check_output(f"{STRIDE} {pdb} -r{args.chain} > {pdb_ss} 2> /dev/null", shell=True)
                 
-                # Run UniDoc
-                output = subprocess.check_output(f"{UNIDOC} {pdb} {args.chain} {pdb_ss}", shell=True)
-                
+                # # Run UniDoc
+                # output = subprocess.check_output(f"{UNIDOC} {pdb} {args.chain} {pdb_ss}", shell=True)
+
+                output = subprocess.check_output(f"{UNIDOC} {pdb} {args.chain}", shell=True)
+
                 # Format the output
                 output = str(output, 'utf-8').replace('~','-').replace(',','_').replace('/',',').rstrip('\n')
 
@@ -91,8 +96,9 @@ def main():
                 if chopping == '':
                     chopping = "NULL"
                     ndoms = 0
-            
-            except:
+                
+            except Exception as e:
+                print(f"Error occurred while processing {pdb_path}: {e}")
                 chopping = 'NO_SS'
                 ndoms = 0
 
@@ -111,6 +117,9 @@ def main():
             # Cleanup
             if os.path.exists(pdb_ss):
                 os.remove(pdb_ss)
+
+            if os.path.exists(pdb_path_chopped):
+                os.remove(pdb_path_chopped)
     
 if __name__ == "__main__":
     main()
