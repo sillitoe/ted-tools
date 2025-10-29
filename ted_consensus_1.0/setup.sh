@@ -82,9 +82,9 @@ echo "Upgrading pip..."
 pip install --upgrade pip
 
 # Install dependencies from requirements.txt
-if [ -f "requirements.txt" ]; then
+if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     echo "Installing dependencies from requirements.txt..."
-    pip install -r requirements.txt
+    pip install -r "${SCRIPT_DIR}/requirements.txt"
 else
     echo "requirements.txt not found. Please make sure it exists in the current directory."
     exit 1
@@ -107,14 +107,15 @@ for WEIGHT_FILE in "${WEIGHTS_FILES[@]}"; do
 done
 
 
-# if running on macOS install compiler tools and compile stride from source:
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS only
-    if ! command -v gcc &> /dev/null || ! command -v make &> /dev/null; then
-        echo "Installing Xcode Command Line Tools..."
-        xcode-select --install
-        # Wait for installation to complete or prompt user to press enter after installation
-        read -p "Press enter after Xcode Command Line Tools installation is complete"
+    # if running on macOS install compiler tools and compile stride from source:
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS only
+        if ! command -v gcc &> /dev/null || ! command -v make &> /dev/null; then
+            echo "Installing Xcode Command Line Tools..."
+            xcode-select --install
+            # Wait for installation to complete or prompt user to press enter after installation
+            read -p "Press enter after Xcode Command Line Tools installation is complete"
+        fi
     fi
 
     STRIDE_BIN="${UNIDOC_DIR}/bin/stride"
@@ -168,5 +169,6 @@ else
     # Change back to the original directory
     cd "${ORIG_DIR}"
 fi
+
 
 echo "Successfully set up ted_consensus"
