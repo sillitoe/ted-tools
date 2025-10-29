@@ -3,3 +3,4 @@ ted_consensus_1.0/ted_consensus
 ted_consensus_1.0/programs/merizo/weights/*.pt
 **/__pycache__/
 **/*.pyc
+ted_consensus_1.0/programs/unidoc
