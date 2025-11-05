@@ -13,7 +13,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <malloc.h>
 #include <string.h>
 #include <math.h>
 #include <unistd.h> /* SEEK_SET on Suns */
