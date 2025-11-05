@@ -11,15 +11,31 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 # Define the name of the virtual environment directory
 VENV_DIR="ted_consensus"
 WEIGHTS_DIR="${SCRIPT_DIR}/programs/merizo/weights"
+
+UNIDOC_LATEST_DIR="${SCRIPT_DIR}/programs/unidoc_latest"
+UNIDOC_TED_V1_0_DIR="${SCRIPT_DIR}/programs/unidoc_ted_v1_0"
 UNIDOC_DIR="${SCRIPT_DIR}/programs/unidoc"
+TED_VERSION=${TED_VERSION:-"latest"}
+
+if [ "$TED_VERSION" == "latest" ]; then
+    echo "Using latest UniDoc version"
+    UNIDOC_SRC_DIR="$UNIDOC_LATEST_DIR"
+elif [ "$TED_VERSION" == "1.0" ]; then
+    echo "Using TED UniDoc version 1.0"
+    UNIDOC_SRC_DIR="$UNIDOC_TED_V1_0_DIR"
+else
+    echo "Unknown TED_VERSION: $TED_VERSION"
+    exit 1
+fi
+
+# Copy UniDoc source files to unidoc directory
+echo "Setting up UniDoc in programs/unidoc (TED ${TED_VERSION}) ..."
+mkdir -p "$UNIDOC_DIR"
+rsync -a --delete "$UNIDOC_SRC_DIR/" "$UNIDOC_DIR/"
 
 # Define base URL and weights files in an array
 BASE_URL="https://github.com/psipred/Merizo/raw/main/weights"
 WEIGHTS_FILES=("weights_part_0.pt" "weights_part_1.pt" "weights_part_2.pt")
-
-# UniDoc package download URL
-UNIDOC_URL="https://yanglab.qd.sdu.edu.cn/UniDoc/download/UniDoc_20251022.tgz"
-UNIDOC_TGZ="${SCRIPT_DIR}/programs/unidoc.tgz"
 
 # Function to check Python version
 check_python_version() {
@@ -90,45 +106,25 @@ for WEIGHT_FILE in "${WEIGHTS_FILES[@]}"; do
     fi
 done
 
-# No longer download UniDoc automatically - MIT license now allows us to inline
-#
-# # Check if the unidoc directory exists
-# if [ -d "$UNIDOC_DIR" ]; then
-#     echo "programs/unidoc directory already exists."
-# else
-#     if test ! -f "${UNIDOC_TGZ}"; then
-#         echo "programs/unidoc directory not found. Downloading UniDoc ..."
-#         wget --no-check-certificate -O "${UNIDOC_TGZ}" "${UNIDOC_URL}"
-#     fi
 
-#     echo "Unpacking UniDoc package..."
-#     tar -xzvf "${UNIDOC_TGZ}" -C "${SCRIPT_DIR}/programs"
-#     mv "${SCRIPT_DIR}/programs/UniDoc" "${SCRIPT_DIR}/programs/unidoc"
-# fi
+# if running on macOS install compiler tools
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS only
+    if ! command -v gcc &> /dev/null || ! command -v make &> /dev/null; then
+        echo "Installing Xcode Command Line Tools..."
+        xcode-select --install
+        # Wait for installation to complete or prompt user to press enter after installation
+        read -p "Press enter after Xcode Command Line Tools installation is complete"
+    fi
+fi
 
-# Copy the extra run script over to the unidoc dir
-cp "${SCRIPT_DIR}/scripts/Run_UniDoc_from_scratch_structure_afdb.py" "${UNIDOC_DIR}/"
-
-
-# check to see if the stride binary runs
-# with a zero exit code, if not compile it
+# check to see if the Stride binary runs, if not compile it
 STRIDE_BIN="${UNIDOC_DIR}/bin/stride"
 if "${STRIDE_BIN}" > /dev/null 2>&1; then
     echo "Stride binary found."
 else
     rc=$?
     echo "Stride binary failed (exit code ${rc})."
-
-    # if running on macOS install compiler tools and compile stride from source:
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS only
-        if ! command -v gcc &> /dev/null || ! command -v make &> /dev/null; then
-            echo "Installing Xcode Command Line Tools..."
-            xcode-select --install
-            # Wait for installation to complete or prompt user to press enter after installation
-            read -p "Press enter after Xcode Command Line Tools installation is complete"
-        fi
-    fi
 
     ORIG_DIR=$(pwd)
     cd "${SCRIPT_DIR}/programs/chainsaw/stride" || exit
@@ -137,7 +133,7 @@ else
     # Extract the contents of stride.tgz
     tar -zxf stride.tgz
     # Compile stride
-    echo "Compiling stride..."
+    echo "Compiling stride for MacOS..."
     make
     chmod +x stride
 
@@ -156,12 +152,17 @@ else
     rc=$?
     echo "UniDoc_struct binary failed (exit code ${rc})."
 
+    if [ $TED_VERSION == "1.0" ]; then
+        echo "ERROR: cannot continue. UniDoc_struct binary is missing or not working and we cannot compile from source (since TED_VERSION is set to 1.0). If you want to run on MacOS, set TED_VERSION to 'latest'."
+        exit 1
+    fi
+
     # Compile UniDoc_struct
     echo "Compiling UniDoc_struct from src..."
     ORIG_DIR=$(pwd)
     cd "${UNIDOC_DIR}/src"
     rm -f "${UNIDOC_STRUCT_BIN}"
-    # patch to remove all includes for malloc.h
+    # patch to remove all includes for malloc.h for macOS
     sed -i.bak '/#include <malloc.h>/d' *.h
     g++ -std=c++0x   -O3 -ffast-math -lm -o "${UNIDOC_STRUCT_BIN}" UniDoc_struct.cpp
 
