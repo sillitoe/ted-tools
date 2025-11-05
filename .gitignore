@@ -8,3 +8,4 @@ ted_consensus_1.0/programs/merizo/weights/weights_*.pt
 ted_consensus_1.0/programs/unidoc/example
 ted_consensus_1.0/programs/unidoc/Run_UniDoc_from_scratch_structure_afdb.py
 *.bak
+other-tools/dom_v2/domain
