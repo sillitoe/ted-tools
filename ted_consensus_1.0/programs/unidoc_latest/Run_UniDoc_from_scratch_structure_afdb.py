@@ -86,14 +86,15 @@ def main():
                     # subprocess.check_output(f"{STRIDE} {pdb} -r{args.chain} > {pdb_ss} 2> /dev/null", shell=True)
                     
                     # Run UniDoc
+                    print(f"Running UniDoc on {pdb}")
                     # UniDoc_struct needs to be run from the directory containing it as it looks for ./stride
                     # Change to the directory containing UNIDOC
                     unidoc_dir = os.path.dirname(UNIDOC)
                     original_dir = os.getcwd()
                     os.chdir(unidoc_dir)
-                    print(f"Running UniDoc on {pdb} in directory {unidoc_dir}")
                     
                     # Run UniDoc from its directory
+                    # output = subprocess.check_output(f"./UniDoc_struct {pdb} {args.chain} {pdb_ss}", shell=True)
                     output = subprocess.check_output(f"./UniDoc_struct {pdb} {args.chain}", shell=True)
                     
                     # Change back to original directory
