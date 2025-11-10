@@ -13,6 +13,8 @@ VENV_DIR="ted_consensus"
 WEIGHTS_DIR="${SCRIPT_DIR}/programs/merizo/weights"
 UNIDOC_DIR="${SCRIPT_DIR}/programs/unidoc"
 
+DOMQUAL_DIR="${SCRIPT_DIR}/../other-tools/dom_v2"
+
 # Define base URL and weights files in an array
 BASE_URL="https://github.com/psipred/Merizo/raw/main/weights"
 WEIGHTS_FILES=("weights_part_0.pt" "weights_part_1.pt" "weights_part_2.pt")
@@ -169,5 +171,24 @@ else
     cd "${ORIG_DIR}"
 fi
 
+# check to see if the domain quality binary runs
+# with a zero exit code, if not compile it
+DOMQUAL_DOMAIN_BIN="${DOMQUAL_DIR}/domain"
+if "${DOMQUAL_DOMAIN_BIN}" > /dev/null 2>&1; then
+    echo "domain quality binary found."
+else
+    rc=$?
+    echo "domain quality binary failed (exit code ${rc})."
+
+    # Compile domain
+    echo "Compiling domain from src..."
+    ORIG_DIR=$(pwd)
+    cd "${DOMQUAL_DIR}"
+    rm -f "${DOMQUAL_DOMAIN_BIN}"
+    make
+
+    # Change back to the original directory
+    cd "${ORIG_DIR}"
+fi
 
 echo "Successfully set up ted_consensus"
