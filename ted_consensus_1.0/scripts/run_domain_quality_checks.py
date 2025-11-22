@@ -229,12 +229,34 @@ def process_pdb_inputs(
         # original basenames are preserved and domqual can be run on that folder.
         temp_dir = tempfile.TemporaryDirectory()
         with zipfile.ZipFile(pdb_zip, 'r') as z:
+            all_members = z.namelist()
             if pdb_zip_list:
                 with open(pdb_zip_list) as f:
-                    wanted = set(line.strip() for line in f if line.strip())
-                members = [m for m in z.namelist() if m in wanted]
+                    wanted = [line.strip() for line in f if line.strip()]
+
+                # Build a map from basename -> members (to handle nested paths inside zip)
+                basename_map = {}
+                for m in all_members:
+                    base = Path(m).name
+                    basename_map.setdefault(base, []).append(m)
+
+                members = []
+                missing = []
+                for w in wanted:
+                    if w in all_members:
+                        members.append(w)
+                    elif w in basename_map:
+                        # Prefer the first match if there are multiple entries with same basename
+                        members.append(basename_map[w][0])
+                        if len(basename_map[w]) > 1:
+                            print(f"Warning: multiple entries in zip match '{w}'; using '{basename_map[w][0]}'", file=sys.stderr)
+                    else:
+                        missing.append(w)
+
+                if missing:
+                    print(f"Warning: the following entries from --zip-list were not found in the zip: {', '.join(missing)}", file=sys.stderr)
             else:
-                members = [m for m in z.namelist() if m.endswith('.pdb')]
+                members = [m for m in all_members if m.endswith('.pdb')]
             for member in members:
                 # ensure directories exist
                 target_path = Path(temp_dir.name) / member
