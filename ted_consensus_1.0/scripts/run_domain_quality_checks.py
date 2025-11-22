@@ -19,8 +19,10 @@ import hashlib
 import argparse
 import subprocess
 import sys
+import zipfile
+import tempfile
 from pathlib import Path
-from typing import Dict, List, Tuple, Iterator
+from typing import Dict, List, Tuple, Iterator, Optional
 from Bio.SeqUtils import seq1
 from Bio.PDB.PDBParser import PDBParser
 from Bio.PDB import Polypeptide
@@ -34,33 +36,34 @@ DEFAULT_DOM_PATH = TOOLS_DIR / 'dom_v2/domain'
 DEFAULT_DOMQUAL_PATH = TOOLS_DIR / 'domqual/pytorch_foldclass_pred_dir.py'
 
 
-def get_pdb_files_efficiently(
-    pdb_directory: str
-) -> Iterator[Path]:
-    """
-    Efficiently iterate through PDB files in a large directory.
-    
-    Args:
-        pdb_directory (str): Directory containing PDB files
-        
-    Yields:
-        Path: PDB file paths
-        
-    Note:
-        Uses os.scandir() for better performance with large directories.
-    """
+
+def get_pdb_files_from_directory(pdb_directory: str) -> Iterator[Path]:
     pdb_dir_path = Path(pdb_directory)
-    
     try:
-        # Use os.scandir() for better performance than glob() on large directories
         with os.scandir(pdb_directory) as entries:
             for entry in entries:
-                # Check if it's a PDB file
                 if entry.is_file() and entry.name.endswith('.pdb'):
                     yield pdb_dir_path / entry.name
-                        
     except OSError as e:
         raise OSError(f"Error scanning directory {pdb_directory}: {e}")
+
+def get_pdb_files_from_zip(zip_path: str, file_list: Optional[str] = None) -> Iterator[Path]:
+    """
+    Yields Path-like objects to temp files extracted from the zip.
+    If file_list is provided, only those files are extracted; otherwise, all .pdb files in the zip.
+    """
+    with zipfile.ZipFile(zip_path, 'r') as z:
+        if file_list:
+            with open(file_list) as f:
+                wanted = set(line.strip() for line in f if line.strip())
+            members = [m for m in z.namelist() if m in wanted]
+        else:
+            members = [m for m in z.namelist() if m.endswith('.pdb')]
+        for member in members:
+            with z.open(member) as src, tempfile.NamedTemporaryFile('wb', delete=False, suffix='.pdb') as tmp:
+                tmp.write(src.read())
+                tmp.flush()
+                yield Path(tmp.name)
 
 
 def extract_pdb_chain_info(pdb_file: str) -> List[Tuple[str, str, str]]:
@@ -204,63 +207,76 @@ def run_domqual_analysis(pdb_dir: str, domqual_script: str) -> Dict[str, float]:
     return quality_scores
 
 
-def process_pdb_directory(
-    pdb_directory: str,
+
+def process_pdb_inputs(
+    pdb_directory: Optional[str],
+    pdb_zip: Optional[str],
+    pdb_zip_list: Optional[str],
     output_file: str,
     dom_path: str,
     domqual_script: str,
     batch_size: int = 1000
 ) -> None:
     """
-    Process PDB files in directory and generate CSV output.
-    
-    Args:
-        pdb_directory (str): Directory containing PDB files
-        output_file (str): Output CSV file path
-        dom_path (str): Path to dom executable
-        domqual_script (str): Path to domqual Python script
-        batch_size (int): Number of files to process before writing intermediate results
+    Process PDB files from a directory or zip and generate CSV output.
     """
-        
-    # Get iterator for PDB files (much more memory efficient for large directories)
-    pdb_files_iter = get_pdb_files_efficiently(pdb_directory)
-    
-    # Run domqual analysis on entire directory first (if needed)
+    temp_dir = None
+    if pdb_directory:
+        pdb_files_iter = get_pdb_files_from_directory(pdb_directory)
+        domqual_input = pdb_directory
+    elif pdb_zip:
+        # Extract selected members (or all .pdb) into a temporary directory so
+        # original basenames are preserved and domqual can be run on that folder.
+        temp_dir = tempfile.TemporaryDirectory()
+        with zipfile.ZipFile(pdb_zip, 'r') as z:
+            if pdb_zip_list:
+                with open(pdb_zip_list) as f:
+                    wanted = set(line.strip() for line in f if line.strip())
+                members = [m for m in z.namelist() if m in wanted]
+            else:
+                members = [m for m in z.namelist() if m.endswith('.pdb')]
+            for member in members:
+                # ensure directories exist
+                target_path = Path(temp_dir.name) / member
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                z.extract(member, temp_dir.name)
+        # Iterate over extracted files (preserves original filenames)
+        def _iter_extracted():
+            for member in members:
+                yield Path(temp_dir.name) / member
+        pdb_files_iter = _iter_extracted()
+        domqual_input = temp_dir.name
+    else:
+        raise ValueError("Must specify either a PDB directory or a zip file.")
+
     print("Running DomQual analysis...")
-    quality_scores = run_domqual_analysis(pdb_directory, domqual_script)
-    
-    # Process files in batches to manage memory and provide progress updates
+    quality_scores = run_domqual_analysis(domqual_input, domqual_script)
+
     results = []
     processed_count = 0
     found_files = set()
-    
-    # Open output file for writing
+
     with open(output_file, 'w', newline='') as csvfile:
         fieldnames = ['PDB_ID', 'Chain_ID', 'Sequence_MD5', 'Dom_Domain_Count', 'DomQual']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        
+
         for pdb_file in pdb_files_iter:
             processed_count += 1
-            found_files.add(pdb_file.name)
-            
+            # Preserve original filename for reporting (extracted files keep their original names)
+            found_files.add(Path(pdb_file).name)
+
             if processed_count % 100 == 0:
                 print(f"Processed {processed_count} files...")
-            
-            # Extract PDB and chain information
+
             pdb_chain_info = extract_pdb_chain_info(str(pdb_file))
-            
             if not pdb_chain_info:
-                print(f"Warning: No valid chains found in {pdb_file.name}")
+                print(f"Warning: No valid chains found in {Path(pdb_file).name}")
                 continue
-                
-            # Run dom analysis
+
             domain_count = run_dom_analysis(str(pdb_file), dom_path)
-            
-            # Get quality score
-            quality_score = quality_scores.get(pdb_file.name, 0.0)
-            
-            # Add results for each chain
+            quality_score = quality_scores.get(Path(pdb_file).name, 0.0)
+
             batch_results = []
             for pdb_id, chain_id, sequence_md5 in pdb_chain_info:
                 batch_results.append({
@@ -270,89 +286,73 @@ def process_pdb_directory(
                     'Dom_Domain_Count': domain_count,
                     'DomQual': quality_score
                 })
-            
-            # Write batch results immediately to save memory
             writer.writerows(batch_results)
-            results.extend(batch_results)  # Keep for final count
-            
-            # Flush periodically for large datasets
+            results.extend(batch_results)
             if processed_count % batch_size == 0:
                 csvfile.flush()
-        
+
     print("\nProcessing complete!")
     print(f"Files processed: {processed_count}")
     print(f"Total entries written: {len(results)}")
     print(f"Results written to: {output_file}")
+    # Clean up temporary extraction directory if used
+    if temp_dir is not None:
+        try:
+            temp_dir.cleanup()
+        except Exception:
+            pass
 
 
 def main():
-    """Main function to parse arguments and run processing."""
     parser = argparse.ArgumentParser(
         description="Process PDB files to extract domain information and quality scores",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Process all PDB files (streaming for large directories)
+  # Process all PDB files in a directory
   %(prog)s -d /large/pdb/directory/ -o results.csv
-
+  # Process all PDB files in a zip
+  %(prog)s -z pdbs.zip -o results.csv
+  # Process only a subset of files in a zip
+  %(prog)s -z pdbs.zip --zip-list files_to_process.txt -o results.csv
         """
     )
-    
-    parser.add_argument(
-        '-d', '--directory',
-        required=True,
-        help='Directory containing PDB files'
-    )
-    
-    parser.add_argument(
-        '-o', '--output',
-        required=True,
-        help='Output CSV file path'
-    )
-    
-    parser.add_argument(
-        '--dom-path',
-        default=DEFAULT_DOM_PATH,
-        help='Path to dom executable'
-    )
-    
-    parser.add_argument(
-        '--domqual-path',
-        default=DEFAULT_DOMQUAL_PATH,
-        help='Path to domqual Python script'
-    )
-        
-    parser.add_argument(
-        '--batch-size',
-        type=int,
-        default=1000,
-        help='Number of files to process before flushing output (default: 1000)'
-    )
-    
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-d', '--directory', help='Directory containing PDB files')
+    group.add_argument('-z', '--zip', help='Zip file containing PDB files')
+    parser.add_argument('--zip-list', help='Optional: file with list of PDB filenames to process from zip')
+    parser.add_argument('-o', '--output', required=True, help='Output CSV file path')
+    parser.add_argument('--dom-path', default=DEFAULT_DOM_PATH, help='Path to dom executable')
+    parser.add_argument('--domqual-path', default=DEFAULT_DOMQUAL_PATH, help='Path to domqual Python script')
+    parser.add_argument('--batch-size', type=int, default=1000, help='Number of files to process before flushing output (default: 1000)')
     args = parser.parse_args()
-    
-    # Validate inputs
-    if not os.path.isdir(args.directory):
+
+    if args.directory and not os.path.isdir(args.directory):
         print(f"Error: Directory '{args.directory}' does not exist", file=sys.stderr)
         sys.exit(1)
-        
+    if args.zip and not os.path.isfile(args.zip):
+        print(f"Error: Zip file '{args.zip}' does not exist", file=sys.stderr)
+        sys.exit(1)
+    if args.zip_list and not os.path.isfile(args.zip_list):
+        print(f"Error: Zip list file '{args.zip_list}' does not exist", file=sys.stderr)
+        sys.exit(1)
     if not os.path.exists(args.dom_path):
         print(f"Error: Dom executable '{args.dom_path}' does not exist", file=sys.stderr)
         sys.exit(1)
-        
     if not os.path.exists(args.domqual_path):
         print(f"Error: DomQual script '{args.domqual_path}' does not exist", file=sys.stderr)
         sys.exit(1)
-    
+
     try:
-        process_pdb_directory(
+        process_pdb_inputs(
             args.directory,
+            args.zip,
+            args.zip_list,
             args.output,
             args.dom_path,
             args.domqual_path,
             args.batch_size
         )
-        
     except KeyboardInterrupt:
         print("\nOperation cancelled by user", file=sys.stderr)
         sys.exit(1)
@@ -360,7 +360,5 @@ Examples:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-
 if __name__ == "__main__":
     main()
-
