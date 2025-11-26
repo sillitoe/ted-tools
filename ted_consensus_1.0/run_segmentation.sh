@@ -57,7 +57,10 @@ FILTER_DOMAINS="${SCRIPT_DIR}/scripts/filter_domains_consensus.py"
 out_merizo="${OUTPUT_DIR}/chopping_merizo.txt"
 log_merizo="${OUTPUT_DIR}/chopping_merizo.log"
 bash "${SEGMENT}" -i "${INPUT_DIR}" -m merizo -o "${OUTPUT_DIR}" > "${log_merizo}" 2>&1
-
+if [ $? != 0 ]; then
+    echo "Merizo segmentation failed (exit: $?). Check log at ${log_merizo}"
+    exit 1
+fi
 if test ! -f "${out_merizo}" || test ! -s "${out_merizo}"; then
     echo "Expected to find chopping file for Merizo at ${out_merizo}!"
     exit 1
