@@ -449,22 +449,23 @@ def main():
         try:  
             with torch.no_grad():
                 segment(network, args, pdb_path, device, zipped=zipped, outfile=args.outfile)
-        except:
-            print("Failed: ", pdb_path)
+        except Exception as e:
+            print(f"Failed: {pdb_path} (Exception: {e})")
             # continue
             if args.device == 'cuda':
                 failed.append(pdb_path)
 
     if args.device == 'cuda': # Re-try failed models on CPU
+        device = torch.device("cpu")
+        network = network.to(device)
         for pdb_path in failed:
-            device = torch.device("cpu")
-            network = network.to(device)
 
             try: 
                 with torch.no_grad():
                     segment(network, args, pdb_path, device, zipped=zipped, outfile=args.outfile)
-            except:
-                print("{}\tSegmentation failed even on CPU".format(os.path.basename(pdb_path)))
+            except Exception as e:
+                print(f"{os.path.basename(pdb_path)}\tSegmentation failed even on CPU (Exception: {e})")
+                raise
         
         
 

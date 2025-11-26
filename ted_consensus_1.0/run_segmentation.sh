@@ -57,7 +57,10 @@ FILTER_DOMAINS="${SCRIPT_DIR}/scripts/filter_domains_consensus.py"
 out_merizo="${OUTPUT_DIR}/chopping_merizo.txt"
 log_merizo="${OUTPUT_DIR}/chopping_merizo.log"
 bash "${SEGMENT}" -i "${INPUT_DIR}" -m merizo -o "${OUTPUT_DIR}" > "${log_merizo}" 2>&1
-
+if [ $? != 0 ]; then
+    echo "Merizo segmentation failed (exit: $?). Check log at ${log_merizo}"
+    exit 1
+fi
 if test ! -f "${out_merizo}" || test ! -s "${out_merizo}"; then
     echo "Expected to find chopping file for Merizo at ${out_merizo}!"
     exit 1
@@ -89,6 +92,10 @@ echo "Calculating consensus domains from Merizo, UniDoc and Chainsaw outputs.. "
 out_consensus="${OUTPUT_DIR}/consensus.tsv"
 log_consensus="${OUTPUT_DIR}/consensus.log"
 "${PY}" "${CONSENSUS}" -c "${out_merizo}" "${out_chainsaw}" "${out_unidoc}" -o "${out_consensus}" > "${log_consensus}" 2>&1
+if [ $? != 0 ]; then
+    echo "Consensus calculation failed. Check log at ${log_consensus}"
+    exit 1
+fi
 
 if test -f "${out_consensus}"; then
     "${PY}" "${FILTER_DOMAINS}" "${out_consensus}" -o "${out_consensus}.tmp"
