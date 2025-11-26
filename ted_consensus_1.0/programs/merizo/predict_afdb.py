@@ -456,9 +456,9 @@ def main():
                 failed.append(pdb_path)
 
     if args.device == 'cuda': # Re-try failed models on CPU
+        device = torch.device("cpu")
+        network = network.to(device)
         for pdb_path in failed:
-            device = torch.device("cpu")
-            network = network.to(device)
 
             try: 
                 with torch.no_grad():
