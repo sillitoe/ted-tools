@@ -89,6 +89,10 @@ echo "Calculating consensus domains from Merizo, UniDoc and Chainsaw outputs.. "
 out_consensus="${OUTPUT_DIR}/consensus.tsv"
 log_consensus="${OUTPUT_DIR}/consensus.log"
 "${PY}" "${CONSENSUS}" -c "${out_merizo}" "${out_chainsaw}" "${out_unidoc}" -o "${out_consensus}" > "${log_consensus}" 2>&1
+if [ $? != 0 ]; then
+    echo "Consensus calculation failed. Check log at ${log_consensus}"
+    exit 1
+fi
 
 if test -f "${out_consensus}"; then
     "${PY}" "${FILTER_DOMAINS}" "${out_consensus}" -o "${out_consensus}.tmp"
