@@ -666,9 +666,13 @@ void ising(float **mat, float *ave, int n, int cycles, int limit, int smooth) {
 /* Smooth array using median filter */
 void smooth(float *dat, int n, int win) {
     int w = win / 2;
-    float *old = calloc((n + win * 2 + 1), sizeof(float));
-    float *new = calloc((n + win * 2 + 1), sizeof(float));
-    int *p = calloc(50, sizeof(int));
+     /* allocate extra padding to ensure all indexed accesses are in-range
+         (ASan showed off-by-one writes for some input sizes). */
+     int pad = win + 5;
+     float *old = calloc((n + win * 2 + pad), sizeof(float));
+     float *new = calloc((n + win * 2 + pad), sizeof(float));
+     /* p needs to be at least win elements; allocate win+1 for safety */
+     int *p = calloc((win + 1), sizeof(int));
     
     if (!old || !new || !p) {
         free(old);
