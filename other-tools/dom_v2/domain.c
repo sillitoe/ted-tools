@@ -365,11 +365,11 @@ void free_pdb(Pdbentry_ *Entry) {
  * ============================================================================ */
 
 float **alloc_matrix(int n) {
-    float **mat = malloc(sizeof(float*) * n);
+    float **mat = calloc(n, sizeof(float*));
     if (!mat) return NULL;
     
     for (int i = 0; i < n; i++) {
-        mat[i] = malloc(sizeof(float) * n);
+        mat[i] = calloc(n, sizeof(float));
         if (!mat[i]) {
             for (int j = 0; j < i; j++) free(mat[j]);
             free(mat);
@@ -388,11 +388,11 @@ void free_matrix(float **mat, int n) {
 }
 
 int **alloc_int_matrix(int n) {
-    int **mat = malloc(sizeof(int*) * n);
+    int **mat = calloc(n, sizeof(int*));
     if (!mat) return NULL;
     
     for (int i = 0; i < n; i++) {
-        mat[i] = malloc(sizeof(int) * n);
+        mat[i] = calloc(n, sizeof(int));
         if (!mat[i]) {
             for (int j = 0; j < i; j++) free(mat[j]);
             free(mat);
@@ -564,9 +564,9 @@ float compare(float **net, int *doms1, int *doms2,
 
 /* Ising model optimization */
 void ising(float **mat, float *ave, int n, int cycles, int limit, int smooth) {
-    float *old = malloc(sizeof(float) * (n + 1));
-    float *new = malloc(sizeof(float) * (n + 1));
-    int **list = malloc(sizeof(int*) * (n + 1));
+    float *old = calloc((n + 1), sizeof(float));
+    float *new = calloc((n + 1), sizeof(float));
+    int **list = calloc((n + 1), sizeof(int*));
     
     if (!old || !new || !list) {
         free(old);
@@ -585,7 +585,7 @@ void ising(float **mat, float *ave, int n, int cycles, int limit, int smooth) {
             if (i != j && mat[i][j] >= 0.0f) count++;
         }
         
-        list[i] = malloc(sizeof(int) * (count + 1));
+        list[i] = calloc((count + 1), sizeof(int));
         if (!list[i]) {
             for (int k = 1; k < i; k++) free(list[k]);
             free(old);
@@ -666,9 +666,9 @@ void ising(float **mat, float *ave, int n, int cycles, int limit, int smooth) {
 /* Smooth array using median filter */
 void smooth(float *dat, int n, int win) {
     int w = win / 2;
-    float *old = malloc(sizeof(float) * (n + win * 2 + 1));
-    float *new = malloc(sizeof(float) * (n + win * 2 + 1));
-    int *p = malloc(sizeof(int) * 50);
+    float *old = calloc((n + win * 2 + 1), sizeof(float));
+    float *new = calloc((n + win * 2 + 1), sizeof(float));
+    int *p = calloc(50, sizeof(int));
     
     if (!old || !new || !p) {
         free(old);
@@ -912,8 +912,8 @@ int define(int is, int it, Seq *seq, Vec *cas, float *dom,
            const DomainConfig *config) {
     printf("\n\n**** CYCLE %d ****\n\n", it);
     
-    float *tmp = malloc(sizeof(float) * (len + 2));
-    int *p = malloc(sizeof(int) * (len + 1));
+    float *tmp = calloc((len + 2), sizeof(float));
+    int *p = calloc((len + 1), sizeof(int));
     
     if (!tmp || !p) {
         free(tmp);
@@ -1204,11 +1204,11 @@ int protin(Pdbentry_ *prot, Seq *seq, int id, Tri ***m, float z, int flip) {
         vcopy(temp, seq->ca + i);
     }
     
-    Tri **mat = malloc(sizeof(Tri*) * (len + 2));
+    Tri **mat = calloc((len + 2), sizeof(Tri*));
     if (!mat) return 0;
-    
+
     for (int i = 0; i <= len + 1; i++) {
-        mat[i] = malloc(sizeof(Tri) * (len + 2));
+        mat[i] = calloc((len + 2), sizeof(Tri));
         if (!mat[i]) {
             for (int j = 0; j < i; j++) free(mat[j]);
             free(mat);
@@ -1249,12 +1249,12 @@ int copyca(Chain_ *pdb, Seq *s, int flip, float z) {
         return 0;
     }
     
-    char *seq = malloc(sizeof(char) * (n + 3));
-    float *acc = malloc(sizeof(float) * (n + 3));
-    int *dom = malloc(sizeof(int) * (n + 3));
-    int *rid = malloc(sizeof(int) * (n + 3));
-    Vec *ca = malloc(sizeof(Vec) * (n + 3));
-    Vec *cb = malloc(sizeof(Vec) * (n + 3));
+    char *seq = calloc((n + 3), sizeof(char));
+    float *acc = calloc((n + 3), sizeof(float));
+    int *dom = calloc((n + 3), sizeof(int));
+    int *rid = calloc((n + 3), sizeof(int));
+    Vec *ca = calloc((n + 3), sizeof(Vec));
+    Vec *cb = calloc((n + 3), sizeof(Vec));
     
     if (!seq || !acc || !dom || !rid || !ca || !cb) {
         free(seq);
@@ -1449,7 +1449,7 @@ int main(int argc, char *argv[]) {
     float **mat = alloc_matrix(nn);
     float **net = alloc_matrix(nn);
     float *dom = calloc(nn, sizeof(float));  /* Use calloc for initialization */
-    int **doms = malloc(4 * sizeof(int *));
+    int **doms = calloc(4, sizeof(int *));
     if (!doms) {
         fprintf(stderr, "Error: Memory allocation failed (doms rows)\n");
         free_matrix(mat, nn);
