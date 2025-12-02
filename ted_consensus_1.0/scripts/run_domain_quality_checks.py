@@ -125,9 +125,22 @@ def run_dom_analysis(pdb_file: str, dom_path: str) -> int:
             text=True,
             timeout=60
         )
-        
-        if result.returncode != 0:
-            print(f"Dom analysis failed for {pdb_file}: {result.stderr}", file=sys.stderr)
+        # If the process was terminated by a signal, returncode will be negative
+        if result.returncode < 0:
+            sig = -result.returncode
+            print(f"Dom crashed for {pdb_file}: terminated by signal {sig}", file=sys.stderr)
+            if result.stdout:
+                print(f"Dom stdout:\n{result.stdout}", file=sys.stderr)
+            if result.stderr:
+                print(f"Dom stderr:\n{result.stderr}", file=sys.stderr)
+            return 0
+        elif result.returncode > 0:
+            # Non-zero exit (but not signal) - show stderr for debugging
+            print(f"Dom analysis failed for {pdb_file}: exit {result.returncode}", file=sys.stderr)
+            if result.stderr:
+                print(f"Dom stderr:\n{result.stderr}", file=sys.stderr)
+            if result.stdout:
+                print(f"Dom stdout:\n{result.stdout}", file=sys.stderr)
             return 0
             
         # Parse output to extract domain count
@@ -195,6 +208,7 @@ def run_domqual_analysis(pdb_dir: str, domqual_script: str) -> Dict[str, float]:
                         score = float(parts[1])
                         # Extract just the filename
                         pdb_filename = Path(pdb_path).name
+                        print(f"DomQual score for {pdb_filename}: {score}")
                         quality_scores[pdb_filename] = score
                     except (ValueError, IndexError):
                         continue
