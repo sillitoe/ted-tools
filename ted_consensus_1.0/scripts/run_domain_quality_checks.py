@@ -36,6 +36,13 @@ DEFAULT_DOM_PATH = TOOLS_DIR / 'dom_v2/domain'
 DEFAULT_DOMQUAL_PATH = TOOLS_DIR / 'domqual/pytorch_foldclass_pred_dir.py'
 
 
+def format_sigfigs(value: float, sigfigs: int = 5) -> str:
+    """Format a float to a given number of significant figures for output."""
+    if value == 0 or value == 0.0:
+        return "0"
+    return f"{value:.{sigfigs}g}"
+
+
 
 def get_pdb_files_from_directory(pdb_directory: str) -> Iterator[Path]:
     pdb_dir_path = Path(pdb_directory)
@@ -312,6 +319,7 @@ def process_pdb_inputs(
 
             domain_count = run_dom_analysis(str(pdb_file), dom_path)
             quality_score = quality_scores.get(Path(pdb_file).name, 0.0)
+            quality_score_out = format_sigfigs(quality_score, 5)
 
             batch_results = []
             for pdb_id, chain_id, sequence_md5 in pdb_chain_info:
@@ -320,7 +328,7 @@ def process_pdb_inputs(
                     'Chain_ID': chain_id,
                     'Sequence_MD5': sequence_md5,
                     'Dom_Domain_Count': domain_count,
-                    'DomQual': quality_score
+                    'DomQual': quality_score_out
                 })
             writer.writerows(batch_results)
             results.extend(batch_results)
