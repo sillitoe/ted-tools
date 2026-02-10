@@ -53,7 +53,7 @@ def main():
     print("Finished file importing in {:.2f} seconds".format(time.time() - start_time))
         
     # Get unique list of targets from all chopping files
-    unique_targets = list(set(targets))
+    unique_targets = sorted(set(targets))
     
     with open(args.output, 'w+') as f:
         for _, target in enumerate(unique_targets):
