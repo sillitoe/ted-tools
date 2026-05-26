@@ -199,8 +199,8 @@ def run_domqual_analysis(pdb_dir: str, domqual_script: str) -> Dict[str, float]:
         )
         
         if result.returncode != 0:
-            print(f"DomQual analysis failed: {result.stderr}", file=sys.stderr)
-            return quality_scores
+            # print(f"DomQual analysis failed: {result.stderr}", file=sys.stderr)
+            raise RuntimeError(f"DomQual analysis failed with exit code {result.returncode}, stderr: {result.stderr}")
             
         # Parse output to extract quality scores
         output = result.stdout
