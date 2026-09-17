@@ -18,15 +18,17 @@ PROG_DIR="${SCRIPT_DIR}/../programs"
 
 py=$(which python)
 custom_chopping=''
+sort_order='decreasing'
 
 FILTER_DOMAINS="${SCRIPT_DIR}/filter_domains.py"
 
-while getopts ":i:m:o:c:" opt; do
+while getopts ":i:m:o:c:s:" opt; do
   case $opt in
     i) inputs=$(readlink -f "$OPTARG") ;;
     m) method=$OPTARG ;;
     o) output=$(readlink -f "$OPTARG") ;;
     c) custom_chopping=${OPTARG} ;;
+    s) sort_order=${OPTARG} ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
       exit 1
@@ -40,7 +42,12 @@ done
 
 # Check if both options are provided
 if [[ -z "${inputs}" || -z "${method}" || -z "${output}" ]]; then
-  echo "Usage: run_segment_afdb.sh -i <structure_directory> -m <merizo/unidoc/chainsaw> -o <output_directory> [-c <chopping>]"
+  echo "Usage: run_segment_afdb.sh -i <structure_directory> -m <merizo/unidoc/chainsaw> -o <output_directory> [-c <chopping>] [-s <increasing/decreasing>]"
+  exit 1
+fi
+
+if [[ "${sort_order}" != "increasing" && "${sort_order}" != "decreasing" ]]; then
+  echo "Invalid sort order: ${sort_order}. Allowed options are 'increasing' or 'decreasing'."
   exit 1
 fi
 
@@ -71,7 +78,9 @@ echo "Running ${method} on targets in ${inputs}"
 # Each method will take the list containing the paths to the targets
 if [ "${method}" = "merizo" ] || [ "${method}" = "unidoc" ]; then
     target_list="${output%/}targets.txt"
-    readlink -f "${inputs}/"*.pdb > "${target_list}"
+  readlink -f "${inputs}/"*.pdb | while read -r pdb; do
+    printf '%s\t%s\n' "$(awk '$1 == "ATOM" && substr($0, 13, 4) == " CA " { count++ } END { print count + 0 }' "${pdb}")" "${pdb}"
+  done | sort -n$([ "${sort_order}" = "decreasing" ] && printf 'r') | cut -f2- > "${target_list}"
 
     if [[ ${custom_chopping} == '' ]]; then
         ${py} "${RUN_SCRIPT}" -l "${target_list}" --out "${output_file}"
@@ -85,7 +94,7 @@ if [ "${method}" = "merizo" ] || [ "${method}" = "unidoc" ]; then
     fi
 
 elif [ "${method}" = "chainsaw" ]; then
-    ${py} "${RUN_SCRIPT}" --structure_directory "${inputs}" -o "${output_file}" --append
+  ${py} "${RUN_SCRIPT}" --structure_directory "${inputs}" -o "${output_file}" --append --sort_order "${sort_order}"
 fi
 
 # Filter choppings to remove small segments and single-residue domains
