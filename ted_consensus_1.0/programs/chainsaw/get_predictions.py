@@ -271,11 +271,17 @@ def main(args):
     if input_method == 'structure_directory':
         structure_dir = args.structure_directory
         file_index = 0
-        for idx, fname in enumerate(os.listdir(structure_dir)):
+        filenames = [
+            fname for fname in os.listdir(structure_dir)
+            if Path(fname).suffix in ACCEPTED_STRUCTURE_FILE_SUFFIXES
+        ]
+        filenames.sort(
+            key=lambda fname: get_structure_length(os.path.join(structure_dir, fname)),
+            reverse=args.sort_order == 'decreasing',
+        )
+        for idx, fname in enumerate(filenames):
             suffix = Path(fname).suffix
             LOG.debug(f"Checking file {fname} (suffix: {suffix}) ..")
-            if suffix not in ACCEPTED_STRUCTURE_FILE_SUFFIXES:
-                continue
 
             file_index += 1
             chain_id = Path(fname).stem
@@ -370,6 +376,8 @@ def parse_args():
                         help='path to directory containing PDB or MMCIF files')
     parser.add_argument('--structure_file', type=str, default=None,
                         help='path to PDB or MMCIF files')
+    parser.add_argument('--sort_order', choices=['increasing', 'decreasing'], default='decreasing',
+                        help='order directory inputs by protein length')
     parser.add_argument('--append', '-a', dest='allow_append', action='store_true', default=False, 
                         help='allow results to be appended to an existing file')
     parser.add_argument('--pdb_id', type=str, default=None, help='single pdb id')
