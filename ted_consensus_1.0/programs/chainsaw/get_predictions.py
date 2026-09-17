@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import List
 
 import Bio.PDB
+import torch
 
 from src import constants, featurisers
 from src.domain_assignment.util import convert_domain_dict_strings
@@ -37,32 +38,59 @@ OUTPUT_COLNAMES = ['chain_id', 'sequence_md5', 'nres', 'ndom', 'chopping', 'unce
 ACCEPTED_STRUCTURE_FILE_SUFFIXES = ['.pdb', '.cif']
 
 
-def get_memory_mb():
+def get_memory_metrics_mb():
+    metrics = {}
     try:
         with open('/proc/self/status') as handle:
             for line in handle:
-                if line.startswith('VmRSS:'):
-                    return int(line.split()[1]) / 1024
+                key = line.split(':', 1)[0]
+                field = {
+                    'VmRSS': 'rss_mb',
+                    'VmSize': 'vms_mb',
+                    'VmHWM': 'peak_rss_mb',
+                    'VmPeak': 'peak_vms_mb',
+                }.get(key)
+                if field:
+                    metrics[field] = int(line.split()[1]) / 1024
     except OSError:
         pass
 
-    maxrss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    if sys.platform == 'darwin':
-        return maxrss / (1024 * 1024)
-    return maxrss / 1024
+    if 'rss_mb' not in metrics or 'peak_rss_mb' not in metrics:
+        maxrss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        maxrss_mb = maxrss / (1024 * 1024) if sys.platform == 'darwin' else maxrss / 1024
+        metrics.setdefault('rss_mb', maxrss_mb)
+        metrics.setdefault('peak_rss_mb', maxrss_mb)
+    return metrics
 
 
-def log_model_memory(program, file_index, file_name, nres, runtime):
+def log_model_memory(program, file_index, file_name, nres, runtime, device, status='complete'):
     timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    memory = get_memory_metrics_mb()
+    memory_fields = (
+        f"rss_mb={memory['rss_mb']:.1f}\t"
+        f"peak_rss_mb={memory['peak_rss_mb']:.1f}\t"
+    )
+    for field in ('vms_mb', 'peak_vms_mb'):
+        if field in memory:
+            memory_fields += f"{field}={memory[field]:.1f}\t"
     LOG.info(
         "TED_MEMORY\t"
         f"timestamp={timestamp}\t"
         f"program={program}\t"
+        f"status={status}\t"
         f"file_index={file_index}\t"
         f"file_name={file_name}\t"
         f"nres={nres}\t"
-        f"rss_mb={get_memory_mb():.1f}\t"
-        f"runtime_s={runtime:.3f}"
+        f"{memory_fields}"
+        f"runtime_s={runtime:.3f}\t"
+        f"device={device}"
+        + (
+            f"\tcuda_allocated_mb={torch.cuda.memory_allocated(device) / (1024 * 1024):.1f}"
+            f"\tcuda_reserved_mb={torch.cuda.memory_reserved(device) / (1024 * 1024):.1f}"
+            f"\tcuda_peak_allocated_mb={torch.cuda.max_memory_allocated(device) / (1024 * 1024):.1f}"
+            f"\tcuda_peak_reserved_mb={torch.cuda.max_memory_reserved(device) / (1024 * 1024):.1f}"
+            if device.type == 'cuda' else ''
+        )
     )
 
 
@@ -84,6 +112,10 @@ def get_model_structure_sequence(structure_model: Bio.PDB.Structure, chain='A') 
     sequence = ''.join([_3to1[r.get_resname()] for r in residues])
     return sequence
 
+
+def get_structure_length(pdb_path: str) -> int:
+    structure = featurisers.get_model_structure(pdb_path)
+    return len(featurisers.get_model_structure_sequence(structure, chain='A'))
 
 
 def get_input_method(args):
@@ -260,10 +292,19 @@ def main(args):
                 continue
 
             LOG.info(f"Making prediction for file {fname} (chain '{chain_id}')")
+            if model.device.type == 'cuda':
+                torch.cuda.reset_peak_memory_stats(model.device)
             start = time.time()
-            result = predict(model, pdb_path, ss_mod=args.ss_mod)
+            try:
+                result = predict(model, pdb_path, ss_mod=args.ss_mod)
+            except Exception:
+                log_model_memory(
+                    'chainsaw', file_index, fname, 'unknown', time.time() - start,
+                    model.device, status='failed',
+                )
+                raise
             prediction_results_file.add_result(result)
-            log_model_memory('chainsaw', file_index, fname, result.nres, time.time() - start)
+            log_model_memory('chainsaw', file_index, fname, result.nres, time.time() - start, model.device)
             if args.pymol_visual:
                 generate_pymol_image(
                     pdb_path=str(result.pdb_path),
@@ -274,10 +315,22 @@ def main(args):
                     pymol_executable=constants.PYMOL_EXE,
                 )
     elif input_method == 'structure_file':
+        if model.device.type == 'cuda':
+            torch.cuda.reset_peak_memory_stats(model.device)
         start = time.time()
-        result = predict(model, args.structure_file, ss_mod=args.ss_mod)
+        try:
+            result = predict(model, args.structure_file, ss_mod=args.ss_mod)
+        except Exception:
+            log_model_memory(
+                'chainsaw', 1, Path(args.structure_file).name, 'unknown',
+                time.time() - start, model.device, status='failed',
+            )
+            raise
         prediction_results_file.add_result(result)
-        log_model_memory('chainsaw', 1, Path(args.structure_file).name, result.nres, time.time() - start)
+        log_model_memory(
+            'chainsaw', 1, Path(args.structure_file).name, result.nres,
+            time.time() - start, model.device,
+        )
         if args.pymol_visual:
             generate_pymol_image(
                 pdb_path=str(result.pdb_path),

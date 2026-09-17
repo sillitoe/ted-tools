@@ -40,38 +40,56 @@ CONF_THRESHOLD = 0.95   # minimum domain confidence / for iteration mode
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
-def get_memory_mb():
+def get_memory_metrics_mb():
+    metrics = {}
     try:
         with open('/proc/self/status') as handle:
             for line in handle:
-                if line.startswith('VmRSS:'):
-                    return int(line.split()[1]) / 1024
+                key = line.split(':', 1)[0]
+                field = {
+                    'VmRSS': 'rss_mb',
+                    'VmSize': 'vms_mb',
+                    'VmHWM': 'peak_rss_mb',
+                    'VmPeak': 'peak_vms_mb',
+                }.get(key)
+                if field:
+                    metrics[field] = int(line.split()[1]) / 1024
     except OSError:
         pass
 
-    maxrss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    if sys.platform == 'darwin':
-        return maxrss / (1024 * 1024)
-    return maxrss / 1024
+    if 'rss_mb' not in metrics or 'peak_rss_mb' not in metrics:
+        maxrss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        maxrss_mb = maxrss / (1024 * 1024) if sys.platform == 'darwin' else maxrss / 1024
+        metrics.setdefault('rss_mb', maxrss_mb)
+        metrics.setdefault('peak_rss_mb', maxrss_mb)
+    return metrics
 
 
-def log_model_memory(program, file_index, file_name, nres, runtime, device):
+def log_model_memory(program, file_index, file_name, nres, runtime, device, status='complete'):
     timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    memory = get_memory_metrics_mb()
     fields = [
         "TED_MEMORY",
         f"timestamp={timestamp}",
         f"program={program}",
+        f"status={status}",
         f"file_index={file_index}",
         f"file_name={file_name}",
         f"nres={nres}",
-        f"rss_mb={get_memory_mb():.1f}",
+        f"rss_mb={memory['rss_mb']:.1f}",
+        f"peak_rss_mb={memory['peak_rss_mb']:.1f}",
         f"runtime_s={runtime:.3f}",
         f"device={device}",
     ]
+    for field in ('vms_mb', 'peak_vms_mb'):
+        if field in memory:
+            fields.append(f"{field}={memory[field]:.1f}")
     if device.type == "cuda":
         fields.extend([
             f"cuda_allocated_mb={torch.cuda.memory_allocated(device) / (1024 * 1024):.1f}",
             f"cuda_reserved_mb={torch.cuda.memory_reserved(device) / (1024 * 1024):.1f}",
+            f"cuda_peak_allocated_mb={torch.cuda.max_memory_allocated(device) / (1024 * 1024):.1f}",
+            f"cuda_peak_reserved_mb={torch.cuda.max_memory_reserved(device) / (1024 * 1024):.1f}",
         ])
     print("\t".join(fields), file=sys.stderr, flush=True)
 
@@ -277,7 +295,9 @@ def merge_doms(domain_ids, dm, ri, max_merge, d0=8.0, d=1.5, alpha=0.43, beta=0.
     return domain_ids_, n_merge
 
 def segment(network, args, pdb_path, device, zipped, outfile, file_index):
-    
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats(device)
+
     start_time = time.time()
     
     if zipped:
@@ -486,11 +506,17 @@ def main():
 
     failed = []
     for file_index, pdb_path in enumerate(files, start=1):
+        attempt_start = time.time()
         try:  
             with torch.no_grad():
                 segment(network, args, pdb_path, device, zipped=zipped, outfile=args.outfile, file_index=file_index)
         except Exception as e:
             print(f"Failed: {pdb_path} (Exception: {e})")
+            pdb_name = os.path.basename(pdb_path.filename if zipped else pdb_path)
+            log_model_memory(
+                "merizo", file_index, pdb_name, "unknown", time.time() - attempt_start,
+                device, status="failed",
+            )
             # continue
             if args.device == 'cuda':
                 failed.append((file_index, pdb_path))
@@ -499,12 +525,17 @@ def main():
         device = torch.device("cpu")
         network = network.to(device)
         for file_index, pdb_path in failed:
-
+            attempt_start = time.time()
             try: 
                 with torch.no_grad():
                     segment(network, args, pdb_path, device, zipped=zipped, outfile=args.outfile, file_index=file_index)
             except Exception as e:
-                print(f"{os.path.basename(pdb_path)}\tSegmentation failed even on CPU (Exception: {e})")
+                pdb_name = os.path.basename(pdb_path.filename if zipped else pdb_path)
+                log_model_memory(
+                    "merizo", file_index, pdb_name, "unknown", time.time() - attempt_start,
+                    device, status="failed",
+                )
+                print(f"{pdb_path}\tSegmentation failed even on CPU (Exception: {e})")
                 raise
         
         
