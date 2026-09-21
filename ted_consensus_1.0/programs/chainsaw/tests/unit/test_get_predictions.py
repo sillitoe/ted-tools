@@ -14,17 +14,18 @@ from src import featurisers
 DEFAULT_DISORDERED_DOMAIN_THRESHOLD = 0.35
 
 
-def test_modified_amino_acid_is_included_in_sequence():
+def test_modified_and_unknown_amino_acids_are_included_in_sequence():
     structure = Bio.PDB.Structure.Structure("modified-residue")
     model = Bio.PDB.Model.Model(0)
     chain = Bio.PDB.Chain.Chain("A")
     chain.add(Bio.PDB.Residue.Residue((" ", 1, " "), "ALA", ""))
     chain.add(Bio.PDB.Residue.Residue(("H_MSE", 2, " "), "MSE", ""))
+    chain.add(Bio.PDB.Residue.Residue(("H_UNK", 3, " "), "UNK", ""))
     structure.add(model)
     model.add(chain)
 
-    assert featurisers.get_model_structure_sequence(model) == "AM"
-    assert get_model_structure_sequence(model) == "AM"
+    assert featurisers.get_model_structure_sequence(model) == "AMX"
+    assert get_model_structure_sequence(model) == "AMX"
 
 
 def get_length_from_pdb_file(pdb_file):
