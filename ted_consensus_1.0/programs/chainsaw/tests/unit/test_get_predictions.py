@@ -2,13 +2,30 @@ import shutil
 import sys
 from pathlib import Path
 
+import Bio.PDB
+
 # ruff: noqa: E402
 REPO_ROOT = Path(__file__).parent.parent.parent.resolve()
 sys.path.append(f"{REPO_ROOT}")
 
-from get_predictions import predict, load_model, PredictionResult
+from get_predictions import get_model_structure_sequence, predict, load_model, PredictionResult
+from src import featurisers
 
 DEFAULT_DISORDERED_DOMAIN_THRESHOLD = 0.35
+
+
+def test_modified_amino_acid_is_included_in_sequence():
+    structure = Bio.PDB.Structure.Structure("modified-residue")
+    model = Bio.PDB.Model.Model(0)
+    chain = Bio.PDB.Chain.Chain("A")
+    chain.add(Bio.PDB.Residue.Residue((" ", 1, " "), "ALA", ""))
+    chain.add(Bio.PDB.Residue.Residue(("H_MSE", 2, " "), "MSE", ""))
+    structure.add(model)
+    model.add(chain)
+
+    assert featurisers.get_model_structure_sequence(model) == "AM"
+    assert get_model_structure_sequence(model) == "AM"
+
 
 def get_length_from_pdb_file(pdb_file):
     with open(pdb_file) as f:
@@ -53,5 +70,3 @@ def test_predict_from_pdb_file(tmp_path, capsys):
 
 def normalise_result(res):
     res.pdb_path = '__PDB_PATH__'
-
-

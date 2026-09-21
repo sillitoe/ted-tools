@@ -108,7 +108,7 @@ def get_model_structure_sequence(structure_model: Bio.PDB.Structure, chain='A') 
     Returns the MD5 hash of a given PDB or MMCIF structure
     """
     residues = [c for c in structure_model[chain].child_list]
-    _3to1 = Bio.PDB.Polypeptide.protein_letters_3to1
+    _3to1 = Bio.PDB.Polypeptide.protein_letters_3to1_extended
     sequence = ''.join([_3to1[r.get_resname()] for r in residues])
     return sequence
 

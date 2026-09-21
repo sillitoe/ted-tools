@@ -32,7 +32,7 @@ def get_model_structure(structure_path) -> Bio.PDB.Structure:
 def get_model_structure_sequence(structure_model: Bio.PDB.Structure, chain='A') -> str:
     """Get sequence of specified chain from parsed PDB/CIF file."""
     residues = [c for c in structure_model[chain].child_list]
-    _3to1 = Bio.PDB.Polypeptide.protein_letters_3to1
+    _3to1 = Bio.PDB.Polypeptide.protein_letters_3to1_extended
     sequence = ''.join([_3to1[r.get_resname()] for r in residues])
     return sequence
 
