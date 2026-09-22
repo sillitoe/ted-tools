@@ -118,6 +118,19 @@ def get_structure_length(pdb_path: str) -> int:
     return len(featurisers.get_model_structure_sequence(structure, chain='A'))
 
 
+def get_null_prediction(pdb_path: str, pdbchain='A') -> PredictionResult:
+    model_structure = featurisers.get_model_structure(pdb_path)
+    sequence = featurisers.get_model_structure_sequence(model_structure, chain=pdbchain)
+    return PredictionResult(
+        pdb_path=pdb_path,
+        sequence_md5=hashlib.md5(sequence.encode('utf-8')).hexdigest(),
+        nres=len(sequence),
+        ndom=0,
+        chopping=None,
+        uncertainty=0.0,
+    )
+
+
 def get_input_method(args):
     number_of_input_methods = sum([ args.uniprot_id is not None,
                                     args.uniprot_id_list_file is not None,
@@ -303,6 +316,15 @@ def main(args):
             start = time.time()
             try:
                 result = predict(model, pdb_path, ss_mod=args.ss_mod)
+            except featurisers.MissingCalphaError as error:
+                LOG.warning(f"{error}; recording a NULL prediction for {fname}")
+                result = get_null_prediction(pdb_path)
+                prediction_results_file.add_result(result)
+                log_model_memory(
+                    'chainsaw', file_index, fname, result.nres,
+                    time.time() - start, model.device, status='skipped_missing_ca',
+                )
+                continue
             except Exception:
                 log_model_memory(
                     'chainsaw', file_index, fname, 'unknown', time.time() - start,
@@ -326,6 +348,19 @@ def main(args):
         start = time.time()
         try:
             result = predict(model, args.structure_file, ss_mod=args.ss_mod)
+        except featurisers.MissingCalphaError as error:
+            LOG.warning(
+                f"{error}; recording a NULL prediction for "
+                f"{Path(args.structure_file).name}"
+            )
+            result = get_null_prediction(args.structure_file)
+            prediction_results_file.add_result(result)
+            log_model_memory(
+                'chainsaw', 1, Path(args.structure_file).name, result.nres,
+                time.time() - start, model.device, status='skipped_missing_ca',
+            )
+            prediction_results_file.flush()
+            return
         except Exception:
             log_model_memory(
                 'chainsaw', 1, Path(args.structure_file).name, 'unknown',

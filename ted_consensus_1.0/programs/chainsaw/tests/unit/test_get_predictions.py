@@ -3,12 +3,19 @@ import sys
 from pathlib import Path
 
 import Bio.PDB
+import pytest
 
 # ruff: noqa: E402
 REPO_ROOT = Path(__file__).parent.parent.parent.resolve()
 sys.path.append(f"{REPO_ROOT}")
 
-from get_predictions import get_model_structure_sequence, predict, load_model, PredictionResult
+from get_predictions import (
+    PredictionResult,
+    get_model_structure_sequence,
+    get_null_prediction,
+    load_model,
+    predict,
+)
 from src import featurisers
 
 DEFAULT_DISORDERED_DOMAIN_THRESHOLD = 0.35
@@ -26,6 +33,33 @@ def test_modified_and_unknown_amino_acids_are_included_in_sequence():
 
     assert featurisers.get_model_structure_sequence(model) == "AMX"
     assert get_model_structure_sequence(model) == "AMX"
+
+
+def test_missing_ca_raises_descriptive_error():
+    model = Bio.PDB.Model.Model(0)
+    chain = Bio.PDB.Chain.Chain("A")
+    residue = Bio.PDB.Residue.Residue((" ", 573, " "), "LYS", "")
+    chain.add(residue)
+    model.add(chain)
+
+    with pytest.raises(featurisers.MissingCalphaError, match="LYS 573"):
+        featurisers.get_distance(model)
+
+
+def test_missing_ca_can_be_recorded_as_null_prediction(tmp_path):
+    pdb_path = tmp_path / "incomplete.pdb"
+    pdb_path.write_text(
+        "ATOM      1  N   LYS A 573       0.000   0.000   0.000  1.00 20.00           N  \n"
+        "ATOM      2  C   LYS A 573       1.000   0.000   0.000  1.00 20.00           C  \n"
+        "END\n"
+    )
+
+    result = get_null_prediction(str(pdb_path))
+
+    assert result.nres == 1
+    assert result.ndom == 0
+    assert result.chopping is None
+    assert result.uncertainty == 0.0
 
 
 def get_length_from_pdb_file(pdb_file):
