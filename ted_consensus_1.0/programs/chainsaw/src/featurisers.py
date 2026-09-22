@@ -14,6 +14,10 @@ from src.utils.secondary_structure import renum_pdb_file, \
 LOG = logging.getLogger(__name__)
 
 
+class MissingCalphaError(ValueError):
+    pass
+
+
 def get_model_structure(structure_path) -> Bio.PDB.Structure:
     """
     Returns the Bio.PDB.Structure object for a given PDB or MMCIF file
@@ -93,8 +97,18 @@ def inference_time_create_features(pdb_path, chain="A", secondary_structure=True
     return torch.Tensor(stacked_features)
 
 def get_distance(structure_model: Bio.PDB.Structure, chain='A'):
-    alpha_coords = np.array([residue['CA'].get_coord() for residue in \
-                             structure_model[chain].get_residues()])
+    residues = list(structure_model[chain].get_residues())
+    missing_ca = [
+        f"{residue.get_resname()} {residue.id[1]}{residue.id[2].strip()}"
+        for residue in residues
+        if 'CA' not in residue
+    ]
+    if missing_ca:
+        raise MissingCalphaError(
+            f"Residues missing CA atoms in chain {chain}: {', '.join(missing_ca)}"
+        )
+
+    alpha_coords = np.array([residue['CA'].get_coord() for residue in residues])
     x = distance_matrix(alpha_coords, alpha_coords)
     x[x == 0] = x[x > 0].min()  # replace zero values in pae / distance
     x = x ** (-1)
